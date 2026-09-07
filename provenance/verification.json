@@ -1,0 +1,31 @@
+{
+  "scope": "Packaging-only local CPU verification, not GPU/boot/image-build acceptance",
+  "test_suites": {
+    "cpu_runtime_and_packaging": 37,
+    "launcher": 2
+  },
+  "clean_patch_apply": true,
+  "verified_changed_paths": 34,
+  "syntax_checked_changed_python_files": 33,
+  "full_reconstructed_source_files": 4390,
+  "accepted_source_and_dependency_files_rehashed": 21969,
+  "accepted_export_bytes_rehashed": 1919615048,
+  "source_hash_mismatches": 0,
+  "registry_layer_chain_verified": true,
+  "registry_additional_nonbytecode_files": 2,
+  "synthetic_png_crc_and_scanlines_verified": true,
+  "new_docker_build": false,
+  "gpu_access": false,
+  "production_access": false,
+  "remote_writes": false,
+  "notes": [
+    "37 runtime/packaging CPU tests plus 2 launcher tests passed using Python 3.11, torch 2.14.0+cpu, triton 3.7.0, safetensors 0.8.0.",
+    "Inherited unified-patch whitespace is intentionally preserved; .gitattributes disables whitespace checks only for patch files.",
+    "Secret scan has two exact-line hash exceptions: unmodified upstream CLI address example and a NVIDIA library version that resembles an IP."
+  ],
+  "clean_staged_export_tests_passed": true,
+  "independent_review_passed": true,
+  "post_review_config_hardening": [
+    "Added container-context weight/archive/env exclusions, copied notices into images, and ran launcher test during digest Dockerfile build; configuration-only changes based on nonblocking review suggestions."
+  ]
+}

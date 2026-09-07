@@ -1,0 +1,4 @@
+# Install torch from the CPU index separately; no CUDA needed.
+torch==2.14.0+cpu
+triton==3.7.0
+safetensors==0.8.0

@@ -1,0 +1,11 @@
+.git
+.venv
+.build
+__pycache__
+**/__pycache__
+.env
+.env.*
+*.safetensors
+*.cubin
+*.tar
+*.tar.gz

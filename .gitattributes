@@ -1,0 +1,2 @@
+# Preserve attested patch whitespace, including unified-diff empty context lines.
+patches/*.patch -whitespace

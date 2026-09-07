@@ -1,0 +1,39 @@
+{
+  "scope": "All files in the saved accepted-image source/dependency attestation; not a full OS rootfs or final vision image export. Bytecode and native dependencies were verified externally but are not vendored.",
+  "files_verified": 21969,
+  "bytes_verified": 1919615048,
+  "missing_paths": [],
+  "mismatch_paths": [],
+  "groups": {
+    "flashinfer": {
+      "files": 5190,
+      "bytes": 89018655,
+      "inventory_sha256": "a4c50be6858ce86effe23aee42d982601a273efdf4bb8526b4df50c60f7771b2"
+    },
+    "nvidia_cutlass_dsl": {
+      "files": 433,
+      "bytes": 469423267,
+      "inventory_sha256": "fd47544ad39014efaa9052ce718657aa38c2b17cd3e2dda821b6c8f8848c6287"
+    },
+    "sgl_kernel": {
+      "files": 45,
+      "bytes": 1194799733,
+      "inventory_sha256": "020b55dbd5da6688268cc3ca5bd8af09e7f3da8eb6f65056e8359910e42575c3"
+    },
+    "sglang": {
+      "files": 6605,
+      "bytes": 118497485,
+      "inventory_sha256": "15182bcd16fe96473d712d3a41b67d548e9583e1baf3545326fd27701b1542c5"
+    },
+    "torch": {
+      "files": 9443,
+      "bytes": 38777314,
+      "inventory_sha256": "18fdea5a1628a62d2067105fde5bf916e0213a56016f4c9bc0571c72f6f1672b"
+    },
+    "tvm_ffi": {
+      "files": 253,
+      "bytes": 9098594,
+      "inventory_sha256": "4bef4a6209ea300da8ace173810c47e290eef13051c53ed9602deb6b371fa28b"
+    }
+  }
+}

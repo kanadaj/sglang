@@ -1,0 +1,12 @@
+{
+  "mratsim_repository": "https://github.com/mratsim/sglang-qwen38fn-sm120-turbo",
+  "mratsim_commit": "b3a0fbbb859408a82171aec4f61eb1e8c5786d93",
+  "sglang_commit": "d91c3682b0b429e4c70df63cd57f819588ce29b0",
+  "day0_image": "docker.io/lmsysorg/sglang:qwen38flashnext@sha256:59f06adce6f91401adf443bd168d45fdb2044d77671fd591c7c57a29d851cbae",
+  "accepted_manifest_digest": "sha256:57534c508031ea4368c37810f569b8931766f03764a68b38c80864218de0b8b2",
+  "accepted_archive_sha256": "99d7c3dc98798ba5c4d3291ab79f9864b422049a8917ef1259858e95c0bb1588",
+  "vision_image": "kanadaj/sglang-qwen38fn-sm120-turbo:r22-tp2-vision-pad32-bias-20260907-v2@sha256:8cb9b598ba0be1bbd77924037a517d71e064ef72807b8b96b0fa5c78eeb2f3cc",
+  "source_export_files_verified": 4389,
+  "changed_paths": 34,
+  "vision_attestation": "Read-only public registry checks: exact 68-layer day0 ancestor; all 85 accepted-parent compressed layer digests preserved in vision; three suffix layers downloaded and hash-verified, only two nonbytecode source files, exact match to runtime snapshot. Accepted full source/dependency export rehashed locally: 21969 files, zero mismatches. No live-container access."
+}

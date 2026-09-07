@@ -1,0 +1,85 @@
+diff --git a/python/sglang/srt/configs/model_config.py b/python/sglang/srt/configs/model_config.py
+--- a/python/sglang/srt/configs/model_config.py
++++ b/python/sglang/srt/configs/model_config.py
+@@ -372,7 +372,7 @@
+         rope_scaling = getattr(self.hf_text_config, "rope_parameters", None) or getattr(
+             self.hf_text_config, "rope_scaling", {}
+         )
+-        self.is_lm_only = getattr(self.hf_config, "language_model_only", False)
++        self.is_lm_only = language_model_only or getattr(self.hf_config, "language_model_only", False)
+         self.model_is_mrope = (
+             not self.is_lm_only
+             and rope_scaling is not None
+diff --git a/python/sglang/srt/layers/rotary_embedding/mrope_rope_index.py b/python/sglang/srt/layers/rotary_embedding/mrope_rope_index.py
+--- a/python/sglang/srt/layers/rotary_embedding/mrope_rope_index.py
++++ b/python/sglang/srt/layers/rotary_embedding/mrope_rope_index.py
+@@ -57,6 +57,8 @@
+     second_per_grid_ts: Optional[torch.Tensor] = None,
+     **kwargs,
+ ) -> Tuple[torch.Tensor, torch.Tensor]:
++    if model_type == "qwen3_8_flash_next":
++        model_type = "qwen4_exp"
+     if model_type == "qwen3_omni_moe":
+         return get_rope_index_qwen3_omni(
+             spatial_merge_size,
+diff --git a/python/sglang/srt/mem_cache/cpp_radix_tree/.clang-format b/python/sglang/srt/mem_cache/cpp_radix_tree/.clang-format
+new file mode 100644
+--- /dev/null
++++ b/python/sglang/srt/mem_cache/cpp_radix_tree/.clang-format
+@@ -0,0 +1,15 @@
++BasedOnStyle: Google
++IndentWidth: 2
++ColumnLimit: 120
++AllowShortFunctionsOnASingleLine: Empty
++DerivePointerAlignment: false
++PointerAlignment: Left
++NamespaceIndentation: None
++SortIncludes: true
++AllowShortLoopsOnASingleLine: false
++BinPackParameters: false              # Prevents packing parameters in declarations
++BinPackArguments: false               # Prevents packing arguments in function calls
++AlignAfterOpenBracket: AlwaysBreak    # Forces a break after the opening parenthesis
++AlignOperands: Align                  # Aligns arguments vertically
++PenaltyBreakBeforeFirstCallParameter: 1  # Encourages breaking before the first argument
++PenaltyReturnTypeOnItsOwnLine: 100    # Keeps return type with function name
+diff --git a/python/sglang/srt/models/qwen3_5_mtp.py b/python/sglang/srt/models/qwen3_5_mtp.py
+--- a/python/sglang/srt/models/qwen3_5_mtp.py
++++ b/python/sglang/srt/models/qwen3_5_mtp.py
+@@ -51,11 +51,18 @@
+     quantized; the loader's fusion gate has to see the same normalization the
+     constructor applies, or it would answer for the target's quantization.
+     """
+-    # Serialized Qwen3.5 ModelOpt checkpoints keep embedded MTP weights in
+-    # BF16. Disable quantization for those checkpoints; non-serialized
+-    # modelopt_fp4 still converts MoE expert weights on load.
++    # Most serialized Qwen3.5 ModelOpt checkpoints keep MTP in BF16,
++    # but mixed checkpoints may explicitly quantize mtp.* (e.g. LIL NVFP4).
++    # Preserve the mixed config in that case so packed weights get packed
++    # allocations; unlisted MTP layers remain unquantized via map lookup.
+     if quant_config and (
+-        quant_config.get_name() == "modelopt_mixed"
++        (
++            quant_config.get_name() == "modelopt_mixed"
++            and not any(
++                name.startswith("mtp.")
++                for name in getattr(quant_config, "quantized_layers", {})
++            )
++        )
+         or (
+             quant_config.get_name() == "modelopt_fp4"
+             and quant_config.is_checkpoint_nvfp4_serialized
+diff --git a/python/sglang/srt/server_args.py b/python/sglang/srt/server_args.py
+--- a/python/sglang/srt/server_args.py
++++ b/python/sglang/srt/server_args.py
+@@ -7719,7 +7719,10 @@
+         except Exception:
+             return False
+ 
+-    LANGUAGE_MODEL_ONLY_ARCHITECTURES = ("MuseGlimmerForConditionalGeneration",)
++    LANGUAGE_MODEL_ONLY_ARCHITECTURES = (
++        "MuseGlimmerForConditionalGeneration",
++        "Qwen4ExpForConditionalGeneration",
++    )
+ 
+     def _handle_language_model_only(self):
+         if not self.language_model_only:

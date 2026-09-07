@@ -1,0 +1,12 @@
+{
+  "template_only": true,
+  "backend": "SGLang",
+  "backend_version": "qwen38-tp2-vision-pad32-bias-v2-dedicated",
+  "version_image": "kanadaj/sglang-qwen38fn-sm120-turbo:r22-tp2-vision-pad32-bias-20260907-v2@sha256:8cb9b598ba0be1bbd77924037a517d71e064ef72807b8b96b0fa5c78eeb2f3cc",
+  "gpus_per_replica": 2,
+  "replicas": 1,
+  "backend_parameters_file": "args.json",
+  "environment_file": "environment.json",
+  "json_model_override_file": "yarn2-model-override.json",
+  "note": "Documentation template, not an API request body. Select unused worker GPUs and local model storage in your installation; no routes, worker IDs or credentials included."
+}

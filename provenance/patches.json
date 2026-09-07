@@ -1,0 +1,109 @@
+[
+  {
+    "file": "0001-sm120-fp8-kv-cache.patch",
+    "sha256": "2cd59607334a8210148e81a684f61a82f61359541d83b5378f562282e46e9cf0",
+    "paths": [
+      "python/sglang/srt/layers/attention/qsa/sparse_attn.py",
+      "python/sglang/srt/layers/attention/qwen_sparse_attn_backend.py"
+    ]
+  },
+  {
+    "file": "0002-sm120-gdn-recover-ssm.patch",
+    "sha256": "542786105f216f27b20644b6bd541881219253fa9c3184fead6a74a40502ec0c",
+    "paths": [
+      "python/sglang/kernels/ops/attention/fla/fused_sigmoid_gating_recurrent.py",
+      "python/sglang/kernels/ops/mamba/causal_conv1d_triton.py",
+      "python/sglang/srt/layers/attention/hybrid_linear_attn_backend.py",
+      "python/sglang/srt/layers/attention/linear/gdn_backend.py",
+      "python/sglang/srt/layers/attention/linear/kernels/gdn_flashinfer.py",
+      "python/sglang/srt/mem_cache/kv_cache_configurator.py",
+      "python/sglang/srt/mem_cache/memory_pool.py",
+      "python/sglang/srt/model_executor/model_runner.py",
+      "python/sglang/srt/server_args.py",
+      "python/sglang/srt/speculative/spec_utils.py"
+    ]
+  },
+  {
+    "file": "0003-sm120-online-fp8.patch",
+    "sha256": "a85ae30d6513f4f765907736b942f95070602dbd58c6f28c160f964c7ce25dad",
+    "paths": [
+      "python/sglang/kernels/ops/gemm/sm120_online_fp8.py",
+      "python/sglang/srt/environ.py",
+      "python/sglang/srt/layers/hc_mix_triton.py",
+      "python/sglang/srt/layers/hyperconnection.py",
+      "python/sglang/srt/layers/logits_processor.py",
+      "python/sglang/srt/layers/quantization/fp8_utils.py",
+      "python/sglang/srt/layers/quantization/unquant.py",
+      "python/sglang/srt/models/qwen4_exp.py"
+    ]
+  },
+  {
+    "file": "0004-serve-lil-checkpoint.patch",
+    "sha256": "61b11e5419f834391e859c098c6fd195501d0fd7dbae9bdf39ede76a62428e1e",
+    "paths": [
+      "python/sglang/srt/configs/model_config.py",
+      "python/sglang/srt/layers/quantization/modelopt_quant.py",
+      "python/sglang/srt/model_loader/weight_utils.py",
+      "python/sglang/srt/models/qwen4_exp.py",
+      "python/sglang/srt/utils/hf_transformers/common.py"
+    ]
+  },
+  {
+    "file": "0005-abort-ghost-fixes.patch",
+    "sha256": "ebb1ef214418d53455437cc0e819750b37cc54ac1d967f3c57848c0f4245345a",
+    "paths": [
+      "python/sglang/srt/managers/scheduler.py",
+      "python/sglang/srt/managers/tokenizer_manager.py"
+    ]
+  },
+  {
+    "file": "0006-single-gpu-token-sync.patch",
+    "sha256": "bf61222d589cb23b70c0b2743ab54a63d5bd62888d160df36b44f9d9cf84ff4b",
+    "paths": [
+      "python/sglang/srt/layers/sampler.py"
+    ]
+  },
+  {
+    "file": "0007-warm-grammar-path-before-serving.patch",
+    "sha256": "2075c31ad4b75d1b8907b796c738ce8086c41f3aa3896b40c1fec1e4b77369d1",
+    "paths": [
+      "python/sglang/srt/entrypoints/warmup.py"
+    ]
+  },
+  {
+    "file": "0008-lil-loader-tp2-corrections.patch",
+    "sha256": "73bff4d537d4fe090e8a10863d2e4b83e20e30b13a4749e8e308d99cb65ac230",
+    "paths": [
+      "python/sglang/srt/models/qwen4_exp.py",
+      "python/sglang/srt/models/qwen3_vl.py",
+      "python/sglang/srt/model_loader/weight_utils.py"
+    ]
+  },
+  {
+    "file": "0009-lil-mrope-config-mtp.patch",
+    "sha256": "13a567b890a4de0cbc8631ef68c92435ccbdefe62dd1fe20d0517fb7ff832ed3",
+    "paths": [
+      "python/sglang/srt/configs/model_config.py",
+      "python/sglang/srt/layers/rotary_embedding/mrope_rope_index.py",
+      "python/sglang/srt/mem_cache/cpp_radix_tree/.clang-format",
+      "python/sglang/srt/models/qwen3_5_mtp.py",
+      "python/sglang/srt/server_args.py"
+    ]
+  },
+  {
+    "file": "0010-packed-ple-tp2-loader-reduction.patch",
+    "sha256": "c0d18b6e80943659329ae4f595158f6ae6212db63728a85ee6a1562727e213b0",
+    "paths": [
+      "python/sglang/srt/models/packed_ple.py",
+      "python/sglang/srt/models/qwen4_exp.py"
+    ]
+  },
+  {
+    "file": "0011-vision-mxfp8-padding-marlin-bias.patch",
+    "sha256": "b68560d38be0e7642238b715ffb404d9b75670eb485072b84f4f47fb67dfb0a0",
+    "paths": [
+      "python/sglang/srt/layers/quantization/modelopt_quant.py",
+      "python/sglang/srt/layers/quantization/vision_mxfp8.py"
+    ]
+  }
+]

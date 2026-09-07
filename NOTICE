@@ -1,0 +1,17 @@
+Qwen TP2 packed-PLE vision deployment source package
+
+SGLang contributors' work is licensed under Apache-2.0.
+Original file copyright/license headers remain intact in runtime/ and
+upstream-preimages/. The root LICENSE supplies Apache-2.0 for SGLang-derived
+changes and new packaging scripts/tests, subject to existing file notices.
+
+SM120 turbo patch foundation: mratsim/sglang-qwen38fn-sm120-turbo
+commit b3a0fbbb859408a82171aec4f61eb1e8c5786d93 (Apache-2.0; see licenses/).
+Patches 0001-0003 and 0005-0007 match that commit exactly. Patch 0004 is a
+locally modified version; 0008 is an additional local correction. Installed
+copies of all eight are preserved exactly, not replaced with current upstream.
+Patches 0009-0011 and deploy/ describe subsequent local changes by Kanadaj's
+serving-stack work, with AI assistance. They are not upstream SGLang releases.
+
+Container dependencies and model weights retain their own licenses; none are
+relicensed by this repository. No weights or dependency binaries are included.
