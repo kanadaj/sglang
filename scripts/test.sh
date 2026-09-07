@@ -6,3 +6,4 @@ PYTHON="${PYTHON:-python3}"
 "$PYTHON" scripts/verify_source.py
 "$PYTHON" -m unittest discover -s tests -v
 "$PYTHON" deploy/test_launcher.py
+"$PYTHON" deploy/test_standalone.py

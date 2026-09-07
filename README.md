@@ -4,6 +4,14 @@ Publishable source and deployment package for the locally accepted Qwen3.8
 Flash-Next LIL NVFP4 stack. **No model weights, container archives, credentials,
 private prompts, routing snapshots or failed optimization experiments.**
 
+## No-repo Docker quickstart
+
+**[Copyable pull/run, health, text and image requests](docs/standalone.md)** —
+no GPUStack, Git clone, external script or JSON file required. The separately
+published `r22-tp2-vision-standalone-20260907-v1` image bundles the full vision
+profile on the immutable vision runtime. Publication and GPU-free CLI tests are
+verified; a new standalone GPU boot/download was not performed.
+
 ## What is included
 
 - An ordered **11-patch series covering 34 changed paths**, not only the two
@@ -73,7 +81,7 @@ reconstructs source atop the pinned native environment; it is **not** a new
 from-scratch CUDA/native dependency build. Dependency name/version inventory is
 provided but is not a complete reproducible native build lockfile.
 
-**Verified here:** clean patch application, full reconstructed-source hashes,
+**Original source-package verification (before the standalone release):** clean patch application, full reconstructed-source hashes,
 CPU tests (37 runtime/packaging + 2 launcher, also repeated from a clean staged
 export), syntax, static secret scan and read-only registry-layer verification.
 All 21,969 saved source/dependency-export files (1,919,615,048 bytes) were hash-checked
@@ -105,7 +113,8 @@ Use matching LIL checkpoint files, including vision processor/tokenizer files,
 and enough host RAM for loading plus packed tables. Accepted packed PLE tables
 occupied about 26.82 GiB across two ranks; this does not bound peak RSS.
 The pending-pair cap does not bound whole-file loader dictionaries or mmap
-paging. No weights are supplied or downloaded by these scripts.
+paging. The local-checkpoint scripts below do not download weights; the
+[no-repo quickstart](docs/standalone.md) instead downloads them on first start.
 
 ```bash
 # Print JSON argv without starting anything. Choose an unoccupied GPU pair.
