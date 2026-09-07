@@ -1,12 +1,11 @@
 # Reuse the published, accepted image byte-for-byte as the runtime base.
-# This packages a convenience wrapper; it does not recreate its OCI digest.
+# Adds a source audit and standard module entrypoint; no serving profile.
+# Inherited historical /opt/qwen-yarn files are unused; no OCI identity claim.
 FROM kanadaj/sglang-qwen38fn-sm120-turbo:r22-tp2-vision-pad32-bias-20260907-v2@sha256:8cb9b598ba0be1bbd77924037a517d71e064ef72807b8b96b0fa5c78eeb2f3cc
 COPY provenance /opt/qwen-package/provenance
 COPY scripts/verify_source.py /opt/qwen-package/scripts/verify_source.py
 RUN python3 /opt/qwen-package/scripts/verify_source.py --tree /sgl-workspace/sglang --complete
 COPY LICENSE NOTICE /usr/share/doc/qwen-tp2-vision/
 COPY licenses /usr/share/doc/qwen-tp2-vision/licenses/
-COPY deploy /opt/qwen-yarn
-RUN python3 /opt/qwen-yarn/test_launcher.py
-ENTRYPOINT ["/opt/nvidia/nvidia_entrypoint.sh", "python3", "/opt/qwen-yarn/launch.py"]
+ENTRYPOINT ["python3", "-m", "sglang.launch_server"]
 CMD ["--help"]

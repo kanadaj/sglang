@@ -1,8 +1,10 @@
-# Standalone Docker quickstart (no clone, no GPUStack)
+# Docker quickstart: patched SGLang, external serving arguments
 
-This published convenience image bundles the complete TP2 vision profile and
-YaRN2 JSON. It adds only launch/config/license files to the immutable published
-vision runtime; the original vision tag and production deployments are unchanged.
+Use the original patched vision runtime as ordinary SGLang: every profile flag,
+opt-in environment variable and the complete YaRN2 override is supplied below.
+No Git checkout, custom launcher, external script or JSON file is required.
+The image's historical entrypoint injects YaRN defaults, so **always use the
+explicit `--entrypoint python3` and `-m sglang.launch_server` shown here**.
 
 ## Requirements
 
@@ -29,27 +31,62 @@ The named volumes are created automatically and persist across container removal
 Place Docker's volume storage on local SSD; this recipe does not relocate it.
 
 ```bash
-IMAGE=kanadaj/sglang-qwen38fn-sm120-turbo:r22-tp2-vision-standalone-20260907-v1@sha256:853293da47f2e968fec680952d682891305e943d36b6aa7863d85fa5c939f65f
+IMAGE=kanadaj/sglang-qwen38fn-sm120-turbo:r22-tp2-vision-pad32-bias-20260907-v2@sha256:99fef9b4927e7e7c0dbd185a6bfe55995cea78e0d5a3c53e4409afb91109dc52
 docker pull "$IMAGE"
 docker run -d --name qwen-vision --gpus '"device=0,1"' --ipc=host \
   -p 127.0.0.1:30000:30000 \
   -v qwen-vision-cache:/cache \
   -v qwen-vision-kernels:/root/.cache \
-  "$IMAGE"
+  -e HF_HOME=/cache/huggingface \
+  -e HF_HUB_OFFLINE=0 \
+  -e TRANSFORMERS_OFFLINE=0 \
+  -e OMP_NUM_THREADS=1 \
+  -e PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+  -e SAFETENSORS_FAST_GPU=1 \
+  -e SGLANG_CACHE_DIR=/cache/sglang-generated \
+  -e SGLANG_ENABLE_HEALTH_ENDPOINT_GENERATION=1 \
+  -e SGLANG_SM120_ONLINE_MXFP8=false \
+  -e SGLANG_PLE_PACKED_NVFP4=1 \
+  -e SGLANG_PLE_PACKED_FP8_REFERENCE=1 \
+  --entrypoint python3 "$IMAGE" -m sglang.launch_server \
+  --model-path local-inference-lab/Qwen3.8-Flash-Next-NVFP4 \
+  --served-model-name qwen-vision --host 0.0.0.0 --port 30000 \
+  --reasoning-parser=auto \
+  --tool-call-parser=auto \
+  --default-chat-template-kwargs '{"reasoning_effort":"medium"}' \
+  --linear-attn-prefill-backend=flashinfer \
+  --linear-attn-decode-backend=flashinfer \
+  --max-mamba-cache-size=84 \
+  --mamba-radix-cache-strategy=extra_buffer \
+  --mamba-track-interval=64 \
+  --mamba-ssm-dtype=bfloat16 \
+  --gdn-mtp-cache-mode=none \
+  --tp-size=2 \
+  --quantization=modelopt_mixed \
+  --kv-cache-dtype=fp8_e4m3 \
+  --context-length=524288 \
+  --mem-fraction-static=0.93 \
+  --page-size=64 \
+  --chunked-prefill-size=4096 \
+  --max-running-requests=16 \
+  --enable-metrics \
+  --enable-cache-report \
+  --cuda-graph-max-bs-decode=16 \
+  --moe-runner-backend=flashinfer_cutlass \
+  --disable-custom-all-reduce \
+  --disable-prefill-cuda-graph \
+  --ple-offload-embedding \
+  --speculative-algorithm=NEXTN \
+  --speculative-num-steps=2 \
+  --speculative-eagle-topk=1 \
+  --speculative-num-draft-tokens=3 \
+  --speculative-draft-model-quantization=modelopt_mixed \
+  --speculative-moe-runner-backend=flashinfer_cutlass \
+  --model-loader-extra-config '{"enable_multithread_load":false,"num_threads":2}' \
+  --startup-weight-load-mode=serial \
+  --mm-enable-dp-encoder \
+  --json-model-override-args '{"text_config":{"vocab_size":248320,"hidden_size":2560,"intermediate_size":12288,"num_hidden_layers":48,"num_attention_heads":24,"num_key_value_heads":2,"hidden_act":"silu","max_position_embeddings":524288,"initializer_range":0.02,"rms_norm_eps":1e-06,"use_cache":true,"head_dim":256,"attention_bias":false,"attention_dropout":0.0,"linear_conv_kernel_dim":4,"linear_key_head_dim":128,"linear_value_head_dim":128,"linear_num_key_heads":16,"linear_num_value_heads":48,"layer_types":["linear_attention","linear_attention","linear_attention","full_attention","linear_attention","linear_attention","linear_attention","full_attention","linear_attention","linear_attention","linear_attention","full_attention","linear_attention","linear_attention","linear_attention","full_attention","linear_attention","linear_attention","linear_attention","full_attention","linear_attention","linear_attention","linear_attention","full_attention","linear_attention","linear_attention","linear_attention","full_attention","linear_attention","linear_attention","linear_attention","full_attention","linear_attention","linear_attention","linear_attention","full_attention","linear_attention","linear_attention","linear_attention","full_attention","linear_attention","linear_attention","linear_attention","full_attention","linear_attention","linear_attention","linear_attention","full_attention"],"moe_intermediate_size":640,"shared_expert_intermediate_size":640,"num_experts_per_tok":10,"num_experts":512,"output_router_logits":false,"router_aux_loss_coef":0.001,"hc_count":4,"hc_lowrank":320,"ple_layer_ids":[2],"ple_embed_dim":2560,"ple_conv_kernel_size":4,"ngram_size":3,"heads_per_ngram":8,"ngram_vocab_size_base":20000000,"make_ngram_vocab_size_divisible_by":128,"split_ngram_parts":128,"output_gate_type":"sigmoid","indexer_n_heads":4,"indexer_kv_heads":1,"indexer_head_dim":128,"indexer_budget":2048,"indexer_compress_ratio":4,"rope_parameters":{"rope_type":"yarn","factor":2.0,"original_max_position_embeddings":262144,"rope_theta":10000000,"mrope_interleaved":true,"mrope_section":[11,11,10],"partial_rotary_factor":0.25},"output_hidden_states":false,"return_dict":true,"dtype":"bfloat16","chunk_size_feed_forward":0,"is_encoder_decoder":false,"id2label":{"0":"LABEL_0","1":"LABEL_1"},"label2id":{"LABEL_0":0,"LABEL_1":1},"problem_type":null,"_name_or_path":"","pad_token_id":null,"bos_token_id":248044,"eos_token_id":248044,"tie_word_embeddings":false,"mamba_ssm_dtype":"float32","mtp":{"hybrid":true,"layer_types":["full_attention"],"mtp_use_hidden_state_from_layer":null,"num_hidden_layers":1,"rope_theta":10000000},"mtp_num_hidden_layers":1,"mtp_use_dedicated_embeddings":false,"model_type":"qwen3_8_flash_next_text","output_attentions":false,"ple_embedding_dtype":"nvfp4"},"max_position_embeddings":524288}'
 ```
-
-The API listens on all interfaces **inside** the container but Docker publishes
-it only on host loopback. For deliberate LAN access, replace the published host
-address with your host's LAN IP and add firewall/access controls. Do not expose
-this unauthenticated endpoint to the public Internet. Host IPC is for the trusted
-multi-GPU workload and reduces IPC isolation.
-
-Defaults: TP2, vision DP encoder, packed CPU PLE with FP8-reference rounding,
-`modelopt_mixed`, FP8 E4M3 KV, NEXTN 2 steps / 3 draft tokens, C16, context 524288,
-YaRN2 and memory fraction 0.93. No `--language-model-only` or offline flags are
-injected. Weights are downloaded by SGLang/Hugging Face, not by this repository.
-The cache includes HF weights and SGLang-generated files under `/cache`, plus
-library compilation caches under `/root/.cache`.
 
 ```bash
 docker logs -f qwen-vision
@@ -91,38 +128,47 @@ with urllib.request.urlopen(request, timeout=300) as response:
 PY
 ```
 
-### Existing local weights and overrides
+### Customize the ordinary SGLang command
 
-For an existing **complete matching** checkpoint (including processor/tokenizer),
-add `-v /absolute/path/to/checkpoint:/model:ro` before `"$IMAGE"` and append
-`--model-path /model` after it. No cached checkpoint JSON is modified. Named
-compilation caches may still be useful. No separate YaRN file is needed.
+Edit flags in place, rather than depending on injected defaults or duplicate
+options. For existing **complete matching** local weights, add
+`-v /absolute/path/to/checkpoint:/model:ro` before `--entrypoint`, and replace
+`--model-path` with `/model`. Include vision processor/tokenizer files.
+No cached checkpoint configuration is modified. Changing context length alone
+does not remove YaRN: edit/remove the explicit JSON override as appropriate.
+The complete `text_config` intentionally preserves the saved deployed profile.
+The runtime updates existing config objects one level deep; it does not recursively
+merge arbitrary nested dictionaries. In particular, supply the complete
+`rope_parameters`, including mRoPE fields, rather than only the YaRN factor.
 
-Additional canonical long flags after the image override matching defaults,
-for example `--max-running-requests 8`. Both `--flag value` and `--flag=value`
-work; use canonical names rather than aliases. Environment defaults can be
-replaced with Docker `-e NAME=value`. `--help` prints the actual SGLang CLI.
-Changing context length alone does not remove the bundled YaRN2 override.
-Do not add language-only mode when you need vision. To remove/restructure an
-entire profile rather than overriding a value, use the base image and explicit
-arguments instead.
+The API listens on all interfaces inside the container but is published only
+on host loopback. For deliberate LAN access, change the host bind address and
+apply firewall/authentication controls; do not expose this unauthenticated API
+to the Internet. Host IPC reduces isolation and is for trusted workloads.
+Weights download on first use; the two named volumes preserve weights/generated
+files and compilation caches. All performance opt-ins are external `-e` options.
+The actual runtime image Config.Env contains CUDA/build/library settings, but
+no model-specific serving profile, offline, packed-PLE or YaRN environment defaults.
+Its inherited `NVIDIA_VISIBLE_DEVICES=all` is constrained by the explicit Docker
+GPU device request. Inherited Entrypoint is
+`["/opt/nvidia/nvidia_entrypoint.sh","python3","/opt/qwen-yarn/launch.py"]`,
+Cmd is `["--help"]`; the command above replaces both and never reads bundled YaRN.
 
 ## Publication and verification boundary
 
-- Standalone OCI index: `sha256:853293da47f2e968fec680952d682891305e943d36b6aa7863d85fa5c939f65f`.
-- Linux/amd64 manifest: `sha256:cb6fa39f4bde4931f6e9d20fcfda31c9945c5e9d95231191578c49c9db30435a`.
-- Runtime parent: `sha256:99fef9b4927e7e7c0dbd185a6bfe55995cea78e0d5a3c53e4409afb91109dc52`.
-- Built with `Dockerfile.standalone`, pushed, and independently read back from
-  Docker Hub. All parent layer digests were preserved; downloaded added files
-  matched this repository. No original tag was overwritten.
-- GPU-free image tests exercised bundled argv/environment/defaults/overrides,
-  actual `ServerArgs` CLI parsing, and default-entrypoint `--help`. No GPUs,
-  checkpoint mounts or network were available to these smoke containers.
+See [verification details](quickstart-verification.md) for exact test scope,
+config-resolution results and non-fatal upstream CLI/mRoPE warnings.
+
+- Original vision index: `sha256:8cb9b598ba0be1bbd77924037a517d71e064ef72807b8b96b0fa5c78eeb2f3cc`.
+- Pinned Linux/amd64 manifest used above: `sha256:99fef9b4927e7e7c0dbd185a6bfe55995cea78e0d5a3c53e4409afb91109dc52`.
+- The former `r22-tp2-vision-standalone-20260907-v1` convenience wrapper is
+  **superseded**, not the recommended image. Its remote tag/history are retained;
+  no new wrapper image is needed or published for this correction.
+- Tests extract this command with Bash and compare flags/environment/complete
+  JSON to the saved profile. Exact-image module `--help` and real CLI parser
+  checks are GPU-free, network-disabled, with no checkpoint mounts.
 - **Not tested here:** a fresh online checkpoint download, standalone GPU boot,
-  or these HTTP examples against a new standalone server. All four production
-  GPUs were left occupied by their existing deployments; no competing server
-  was launched. The parent runtime's separate vision evidence and OCR/latency
-  caveats remain in [README](../README.md#evidence-and-known-limits).
+  or the HTTP examples against a new standalone server. Production was not
+  restarted or changed. See [runtime evidence and caveats](../README.md#evidence-and-known-limits).
   YaRN2 is extrapolation; 524K multimodal accuracy/full C16 residency is not
-  guaranteed. This is a verified publication/configuration recipe, not a new
-  end-to-end GPU qualification.
+  guaranteed. Parser acceptance is not end-to-end GPU qualification.

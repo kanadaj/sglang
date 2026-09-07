@@ -8,7 +8,6 @@ COPY scripts/verify_source.py /opt/qwen-package/scripts/verify_source.py
 RUN python3 /opt/qwen-package/scripts/verify_source.py --tree /sgl-workspace/sglang --apply --complete
 COPY LICENSE NOTICE /usr/share/doc/qwen-tp2-vision/
 COPY licenses /usr/share/doc/qwen-tp2-vision/licenses/
-COPY deploy /opt/qwen-yarn
-RUN python3 /opt/qwen-yarn/test_launcher.py && python3 -m compileall -q /sgl-workspace/sglang/python/sglang
-ENTRYPOINT ["/opt/nvidia/nvidia_entrypoint.sh", "python3", "/opt/qwen-yarn/launch.py"]
+RUN python3 -m compileall -q /sgl-workspace/sglang/python/sglang
+ENTRYPOINT ["python3", "-m", "sglang.launch_server"]
 CMD ["--help"]

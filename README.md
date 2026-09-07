@@ -7,10 +7,12 @@ private prompts, routing snapshots or failed optimization experiments.**
 ## No-repo Docker quickstart
 
 **[Copyable pull/run, health, text and image requests](docs/standalone.md)** —
-no GPUStack, Git clone, external script or JSON file required. The separately
-published `r22-tp2-vision-standalone-20260907-v1` image bundles the full vision
-profile on the immutable vision runtime. Publication and GPU-free CLI tests are
-verified; a new standalone GPU boot/download was not performed.
+ordinary patched SGLang, not a defaults wrapper. The original published vision
+runtime is invoked with `--entrypoint python3 IMAGE -m sglang.launch_server`;
+**all serving flags, packed-PLE opt-ins and the complete YaRN2 JSON remain outside
+the container, visible and editable in the Docker command**. No Git clone,
+external script or JSON file is required. Actual-image GPU-free CLI/parser tests
+are verified; a new standalone GPU boot/download was not performed.
 
 ## What is included
 
@@ -21,7 +23,7 @@ verified; a new standalone GPU boot/download was not performed.
   corrections, mRoPE dispatch and language-only config behavior; mixed ModelOpt
   MTP loading; packed host PLE with global shard validation and TP2 reduction;
   visual FC1 MXFP8 output padding and visual FC2 Marlin logical-order bias.
-- Complete bundled YaRN2 override, launcher, effective TP2 arguments, dedicated
+- Complete external YaRN2 override, optional host-side launch helper, TP2 arguments, dedicated
   GPUStack backend-version template, synthetic CPU tests and image_url example.
 - Hash inventory of **all 4,389 non-bytecode files in the accepted SGLang package**,
   extended to **4,390** with the vision adapter. There are no unexplained missing
@@ -70,7 +72,7 @@ Two build paths (run from this repository):
 ```bash
 # Reconstruct all active source deltas on the pinned official day-0 ABI.
 docker build -t qwen-tp2-vision:source .
-# Preserve the published runtime/dependencies, add wrapper and hash audit.
+# Preserve the published runtime/dependencies, add hash audit (no launcher).
 docker build -f Dockerfile.digest -t qwen-tp2-vision:digest .
 ```
 
@@ -81,7 +83,7 @@ reconstructs source atop the pinned native environment; it is **not** a new
 from-scratch CUDA/native dependency build. Dependency name/version inventory is
 provided but is not a complete reproducible native build lockfile.
 
-**Original source-package verification (before the standalone release):** clean patch application, full reconstructed-source hashes,
+**Original source-package verification (historical):** clean patch application, full reconstructed-source hashes,
 CPU tests (37 runtime/packaging + 2 launcher, also repeated from a clean staged
 export), syntax, static secret scan and read-only registry-layer verification.
 All 21,969 saved source/dependency-export files (1,919,615,048 bytes) were hash-checked

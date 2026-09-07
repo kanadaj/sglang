@@ -5,5 +5,3 @@ export CUDA_VISIBLE_DEVICES= TRITON_INTERPRET=1 OMP_NUM_THREADS=1 MKL_NUM_THREAD
 PYTHON="${PYTHON:-python3}"
 "$PYTHON" scripts/verify_source.py
 "$PYTHON" -m unittest discover -s tests -v
-"$PYTHON" deploy/test_launcher.py
-"$PYTHON" deploy/test_standalone.py
