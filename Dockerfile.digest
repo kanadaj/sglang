@@ -1,8 +1,11 @@
-# Reuse the published, accepted image byte-for-byte as the runtime base.
-# Adds a source audit and standard module entrypoint; no serving profile.
-# Inherited historical /opt/qwen-yarn files are unused; no OCI identity claim.
-FROM kanadaj/sglang-qwen38fn-sm120-turbo:r22-tp2-vision-pad32-bias-20260907-v2@sha256:8cb9b598ba0be1bbd77924037a517d71e064ef72807b8b96b0fa5c78eeb2f3cc
-COPY provenance /opt/qwen-package/provenance
+# Corrected runtime: immutable published vision ABI plus patch 0012 only.
+# No serving profile or custom launcher. All serving args/env are external.
+FROM kanadaj/sglang-qwen38fn-sm120-turbo:r22-tp2-vision-pad32-bias-20260907-v2@sha256:99fef9b4927e7e7c0dbd185a6bfe55995cea78e0d5a3c53e4409afb91109dc52
+COPY provenance/runtime-files.vision-v2.json /opt/qwen-package/parent-runtime-files.json
+RUN python3 -c 'import hashlib,json,pathlib; root=pathlib.Path("/sgl-workspace/sglang"); rows=json.load(open("/opt/qwen-package/parent-runtime-files.json")); mismatches=[p for p,r in rows.items() if hashlib.sha256((root/p).read_bytes()).hexdigest()!=r["sha256"]]; assert not mismatches,mismatches; print("Verified parent source files:",len(rows))'
+COPY runtime/python/sglang/srt/model_loader/loader.py /sgl-workspace/sglang/python/sglang/srt/model_loader/loader.py
+COPY runtime/python/sglang/srt/models/qwen4_exp.py /sgl-workspace/sglang/python/sglang/srt/models/qwen4_exp.py
+COPY provenance/runtime-files.json /opt/qwen-package/provenance/runtime-files.json
 COPY scripts/verify_source.py /opt/qwen-package/scripts/verify_source.py
 RUN python3 /opt/qwen-package/scripts/verify_source.py --tree /sgl-workspace/sglang --complete
 COPY LICENSE NOTICE /usr/share/doc/qwen-tp2-vision/

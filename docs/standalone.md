@@ -1,10 +1,10 @@
 # Docker quickstart: patched SGLang, external serving arguments
 
-Use the original patched vision runtime as ordinary SGLang: every profile flag,
+Use the corrected HF-path vision runtime as ordinary SGLang: every profile flag,
 opt-in environment variable and the complete YaRN2 override is supplied below.
 No Git checkout, custom launcher, external script or JSON file is required.
-The image's historical entrypoint injects YaRN defaults, so **always use the
-explicit `--entrypoint python3` and `-m sglang.launch_server` shown here**.
+The image has a standard SGLang module entrypoint, not a profile launcher. The
+explicit `--entrypoint python3` and `-m sglang.launch_server` below are equivalent.
 
 ## Requirements
 
@@ -31,7 +31,7 @@ The named volumes are created automatically and persist across container removal
 Place Docker's volume storage on local SSD; this recipe does not relocate it.
 
 ```bash
-IMAGE=kanadaj/sglang-qwen38fn-sm120-turbo:r22-tp2-vision-pad32-bias-20260907-v2@sha256:99fef9b4927e7e7c0dbd185a6bfe55995cea78e0d5a3c53e4409afb91109dc52
+IMAGE=kanadaj/sglang-qwen38fn-sm120-turbo:r22-tp2-vision-ple-hfpath-20260908-v1@sha256:4c0d09bcf0cb5906e5abe74edf00643d612c7d8f7306ca6e76d38be2d486da58
 docker pull "$IMAGE"
 docker run -d --name qwen-vision --gpus '"device=0,1"' --ipc=host \
   -p 127.0.0.1:30000:30000 \
@@ -150,25 +150,24 @@ files and compilation caches. All performance opt-ins are external `-e` options.
 The actual runtime image Config.Env contains CUDA/build/library settings, but
 no model-specific serving profile, offline, packed-PLE or YaRN environment defaults.
 Its inherited `NVIDIA_VISIBLE_DEVICES=all` is constrained by the explicit Docker
-GPU device request. Inherited Entrypoint is
-`["/opt/nvidia/nvidia_entrypoint.sh","python3","/opt/qwen-yarn/launch.py"]`,
-Cmd is `["--help"]`; the command above replaces both and never reads bundled YaRN.
+GPU device request. Entrypoint is `["python3","-m","sglang.launch_server"]`,
+Cmd is `["--help"]`. Historical `/opt/qwen-yarn` files inherited from the base
+are unused; no serving defaults or custom launcher are added by this correction.
 
 ## Publication and verification boundary
 
-See [verification details](quickstart-verification.md) for exact test scope,
-config-resolution results and non-fatal upstream CLI/mRoPE warnings.
+See [HF checkpoint fix evidence](ple-hf-path-fix.md) for the corrected image,
+source identity, tests and limits. The old vision image worked with GPUStack's
+local checkpoint paths but failed the HF repo-ID packed-PLE pre-read; the
+quickstart now uses patch 0012 rather than that old image.
 
-- Original vision index: `sha256:8cb9b598ba0be1bbd77924037a517d71e064ef72807b8b96b0fa5c78eeb2f3cc`.
-- Pinned Linux/amd64 manifest used above: `sha256:99fef9b4927e7e7c0dbd185a6bfe55995cea78e0d5a3c53e4409afb91109dc52`.
-- The former `r22-tp2-vision-standalone-20260907-v1` convenience wrapper is
-  **superseded**, not the recommended image. Its remote tag/history are retained;
-  no new wrapper image is needed or published for this correction.
-- Tests extract this command with Bash and compare flags/environment/complete
-  JSON to the saved profile. Exact-image module `--help` and real CLI parser
-  checks are GPU-free, network-disabled, with no checkpoint mounts.
-- **Not tested here:** a fresh online checkpoint download, standalone GPU boot,
-  or the HTTP examples against a new standalone server. Production was not
-  restarted or changed. See [runtime evidence and caveats](../README.md#evidence-and-known-limits).
-  YaRN2 is extrapolation; 524K multimodal accuracy/full C16 residency is not
-  guaranteed. Parser acceptance is not end-to-end GPU qualification.
+- The serving profile remains external and unchanged, including packed NVFP4
+  PLE, FP8-reference rounding, TP2 and vision.
+- Synthetic CPU tests import the actual runtime modules and exercise the real
+  offline HF resolver, loader, indexed safetensors and packed-PLE scale reader.
+- Original parser/config checks are documented in
+  [historical quickstart verification](quickstart-verification.md).
+- **Not tested:** a fresh full-checkpoint download, standalone GPU boot, or the
+  HTTP examples against a new standalone server. Production was not restarted
+  or changed. YaRN2 is extrapolation; 524K multimodal accuracy/full C16 residency
+  is not guaranteed. CPU loader tests are not end-to-end GPU qualification.

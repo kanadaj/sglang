@@ -7,7 +7,7 @@ private prompts, routing snapshots or failed optimization experiments.**
 ## No-repo Docker quickstart
 
 **[Copyable pull/run, health, text and image requests](docs/standalone.md)** —
-ordinary patched SGLang, not a defaults wrapper. The original published vision
+ordinary patched SGLang, not a defaults wrapper. The corrected HF-path vision
 runtime is invoked with `--entrypoint python3 IMAGE -m sglang.launch_server`;
 **all serving flags, packed-PLE opt-ins and the complete YaRN2 JSON remain outside
 the container, visible and editable in the Docker command**. No Git clone,
@@ -16,7 +16,7 @@ are verified; a new standalone GPU boot/download was not performed.
 
 ## What is included
 
-- An ordered **11-patch series covering 34 changed paths**, not only the two
+- An ordered **12-patch series covering 35 changed paths**, not only the two
   latest vision files. Complete changed runtime sources and clean preimages
   are included for offline audit and reconstruction.
 - SM120 FP8 KV / GDN / online-FP8 foundation; LIL config aliases, packed loader
@@ -56,15 +56,18 @@ untracked in that previous repository. 0009 captures remaining mRoPE/config/MTP
 copies and one generated `.clang-format` file (non-executable, origin not linked
 to a distinct source change). 0010 captures accepted packed PLE directly from
 the attested installed tree. 0011 is the saved vision build's exact two-file
-source overlay. No failed MoE, QSA scratch/selector/metadata, PCIe all-reduce or
+source overlay. 0012 propagates the loader-resolved checkpoint identity to PLE
+pre-reads (including HF repo IDs); its new evidence is separate from the original
+vision attestation. `runtime-files.vision-v2.json` preserves the original inventory.
+No failed MoE, QSA scratch/selector/metadata, PCIe all-reduce or
 MoE finalize workaround was imported. Existing upstream kernels are retained.
 
 ## Build or use the immutable image
 
-Published vision image:
+Current corrected runtime ([HF-path fix evidence](docs/ple-hf-path-fix.md)):
 
 ```text
-kanadaj/sglang-qwen38fn-sm120-turbo:r22-tp2-vision-pad32-bias-20260907-v2@sha256:8cb9b598ba0be1bbd77924037a517d71e064ef72807b8b96b0fa5c78eeb2f3cc
+kanadaj/sglang-qwen38fn-sm120-turbo:r22-tp2-vision-ple-hfpath-20260908-v1@sha256:4c0d09bcf0cb5906e5abe74edf00643d612c7d8f7306ca6e76d38be2d486da58
 ```
 
 Two build paths (run from this repository):
@@ -72,7 +75,7 @@ Two build paths (run from this repository):
 ```bash
 # Reconstruct all active source deltas on the pinned official day-0 ABI.
 docker build -t qwen-tp2-vision:source .
-# Preserve the published runtime/dependencies, add hash audit (no launcher).
+# Preserve the immutable vision ABI; apply only the HF-path fix (no launcher).
 docker build -f Dockerfile.digest -t qwen-tp2-vision:digest .
 ```
 

@@ -2029,6 +2029,8 @@ class Qwen4ExpForConditionalGeneration(Qwen3VLForConditionalGeneration):
         )
 
     def load_weights(self, weights: Iterable[Tuple[str, torch.Tensor]]):
+        # Consume load-scoped metadata once, including on failed loads.
+        resolved_sources = self.__dict__.pop("_resolved_weight_sources", ())
         stacked_params_mapping = [
             ("qkv_proj", "q_proj", "q"),
             ("qkv_proj", "k_proj", "k"),
@@ -2378,13 +2380,18 @@ class Qwen4ExpForConditionalGeneration(Qwen3VLForConditionalGeneration):
                 )
                 + ".ngram_embedding.weight_scale_2"
             )
-            ckpt_dir = getattr(self.config, "_name_or_path", "")
-            if not os.path.isdir(ckpt_dir):
-                # The config's path field is unreliable across config rebuilds. The server args
-                # carry the canonical checkpoint directory the safetensors iterator was opened against.
-                from sglang.srt.server_args import get_global_server_args
-
-                ckpt_dir = get_global_server_args().model_path
+            resolved = resolved_sources[0] if resolved_sources else None
+            if resolved is not None:
+                # PLE belongs to the primary Qwen checkpoint. Use the exact
+                # loader-resolved revision and file set, never a second HF lookup
+                # or the target server's path when loading a separate draft.
+                if not resolved.use_safetensors or resolved.source.prefix:
+                    raise ValueError("packed PLE pre-read requires an unprefixed safetensors source")
+                ckpt_dir = resolved.hf_folder
+            else:
+                # Direct local load_weights callers have no loader descriptor.
+                # A repo ID is not a directory; never guess from server globals.
+                ckpt_dir = getattr(self.config, "_name_or_path", "")
             if not os.path.isdir(ckpt_dir):
                 raise ValueError(
                     f"packed PLE table {mod_prefix} needs its weight_scale_2 "
@@ -2405,7 +2412,14 @@ class Qwen4ExpForConditionalGeneration(Qwen3VLForConditionalGeneration):
                     )
                 shard_files = [os.path.join(ckpt_dir, fname)]
             else:
-                shard_files = [os.path.join(ckpt_dir, "model.safetensors")]
+                shard_files = (list(resolved.weight_files) if resolved is not None
+                               else [os.path.join(ckpt_dir, "model.safetensors")])
+            if resolved is not None:
+                selected = {os.path.realpath(path) for path in resolved.weight_files}
+                if any(os.path.realpath(path) not in selected for path in shard_files):
+                    raise ValueError(
+                        f"packed PLE table {mod_prefix}: scale file is not in the loader-resolved checkpoint"
+                    )
             for shard_file in shard_files:
                 with safe_open(shard_file, framework="pt") as f:
                     if ckpt_key not in f.keys():

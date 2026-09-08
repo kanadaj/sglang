@@ -26,6 +26,7 @@ def source():
 
 
 def functions(names, scope):
+    scope.setdefault("resolved_sources", ())  # load_weights closure, direct local fixtures
     nodes = [n for n in ast.walk(source()) if isinstance(n, ast.FunctionDef) and n.name in names]
     exec(compile(ast.fix_missing_locations(ast.Module(body=nodes,type_ignores=[])), '<actual-sglang-methods>', 'exec'),scope)
 

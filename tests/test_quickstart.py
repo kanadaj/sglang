@@ -39,7 +39,7 @@ class QuickstartTests(unittest.TestCase):
         self.assertEqual(argv[argv.index('--gpus') + 1], '"device=0,1"')
         module = argv.index('-m')
         self.assertEqual(argv[module + 1], 'sglang.launch_server')
-        self.assertIn('@sha256:99fef9b4927e7e7c0dbd185a6bfe55995cea78e0d5a3c53e4409afb91109dc52', argv[module - 1])
+        self.assertEqual(json.loads((ROOT / 'provenance/ple-hf-path-fix.json').read_text())['image'], argv[module - 1])
         args = argv[module + 2:]
         expected = json.loads((ROOT / 'deploy/args.json').read_text())
         for arg in expected:

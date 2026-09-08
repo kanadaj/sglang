@@ -1,0 +1,23 @@
+{
+  "image": "kanadaj/sglang-qwen38fn-sm120-turbo:r22-tp2-vision-ple-hfpath-20260908-v1@sha256:4c0d09bcf0cb5906e5abe74edf00643d612c7d8f7306ca6e76d38be2d486da58",
+  "base_image": "kanadaj/sglang-qwen38fn-sm120-turbo:r22-tp2-vision-pad32-bias-20260907-v2@sha256:99fef9b4927e7e7c0dbd185a6bfe55995cea78e0d5a3c53e4409afb91109dc52",
+  "status": "published and independently registry-verified",
+  "patch": "0012-ple-resolved-checkpoint-source.patch",
+  "historical_inventory": "runtime-files.vision-v2.json",
+  "current_inventory": "runtime-files.json",
+  "checkpoint_tests": 16,
+  "existing_cpu_tests": 39,
+  "unittest_total": 55,
+  "actual_image_cli_parser": true,
+  "module_help": true,
+  "full_installed_source_files": 4390,
+  "changed_paths": 35,
+  "syntax_python_files": 34,
+  "gpu_boot_verified": false,
+  "production_modified": false,
+  "source_hashes": {
+    "python/sglang/srt/model_loader/loader.py": "14573b0f4bcbf9bf43fa2ce9384913ace2a0850655b25953aaef894684c69059",
+    "python/sglang/srt/models/qwen4_exp.py": "e0188ebd4fb01ab98029eae0a1ed73622338297af5483ad79459747eb104a8ab"
+  },
+  "verification_limits": "Synthetic offline fixtures, actual installed modules; GPU model construction and post-load offload substituted. No full model download or GPU boot."
+}

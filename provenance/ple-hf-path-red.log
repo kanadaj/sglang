@@ -1,0 +1,37 @@
+/sgl-workspace/sglang/python/sglang/srt/layers/quantization/awq/awq.py:52: UserWarning: Only CUDA, HIP and XPU support AWQ currently.
+  warnings.warn(f"Only CUDA, HIP and XPU support AWQ currently.")
+/sgl-workspace/sglang/python/sglang/srt/layers/quantization/gguf.py:69: UserWarning: Only CUDA, MUSA and NPU support GGUF quantization currently.
+  warnings.warn(f"Only CUDA, MUSA and NPU support GGUF quantization currently.")
+W0908 08:56:34.096000 1 torch/utils/cpp_extension.py:178] No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+test_hf_id_real_offline_resolution_late_nonunit_scale (__main__.CheckpointTests.test_hf_id_real_offline_resolution_late_nonunit_scale) ...
+Loading safetensors checkpoint shards:   0% Completed | 0/2 [00:00<?, ?it/s]ERROR
+
+======================================================================
+ERROR: test_hf_id_real_offline_resolution_late_nonunit_scale (__main__.CheckpointTests.test_hf_id_real_offline_resolution_late_nonunit_scale)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tests/runtime_checkpoint.py", line 98, in test_hf_id_real_offline_resolution_late_nonunit_scale
+    self.load(m, self.config())
+  File "/tests/runtime_checkpoint.py", line 88, in load
+    return self.loader.load_model(model_config=cfg, device_config=NS(device='cpu'))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/sgl-workspace/sglang/python/sglang/srt/model_loader/loader.py", line 991, in load_model
+    self.load_weights_and_postprocess(
+  File "/sgl-workspace/sglang/python/sglang/srt/model_loader/loader.py", line 1043, in load_weights_and_postprocess
+    model.load_weights(weights)
+  File "/sgl-workspace/sglang/python/sglang/srt/models/qwen4_exp.py", line 2515, in load_weights
+    if load_qwen4_exp_ple_shard(name, loaded_weight):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/sgl-workspace/sglang/python/sglang/srt/models/qwen4_exp.py", line 2259, in load_qwen4_exp_ple_shard
+    _ple_resolve_global_scale(ple_mod, mod_prefix))
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/sgl-workspace/sglang/python/sglang/srt/models/qwen4_exp.py", line 2389, in _ple_resolve_global_scale
+    raise ValueError(
+ValueError: packed PLE table model.layers.1.ple.ple_embedding needs its weight_scale_2 pre-read but no local checkpoint dir is known (config path 'fixture/packed-ple')
+
+----------------------------------------------------------------------
+Ran 1 test in 0.008s
+
+FAILED (errors=1)
+
+Loading safetensors checkpoint shards:   0% Completed | 0/2 [00:00<?, ?it/s]

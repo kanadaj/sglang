@@ -105,5 +105,13 @@
       "python/sglang/srt/layers/quantization/modelopt_quant.py",
       "python/sglang/srt/layers/quantization/vision_mxfp8.py"
     ]
+  },
+  {
+    "file": "0012-ple-resolved-checkpoint-source.patch",
+    "sha256": "31ceb532128db7793c49ca55b78016c0d521c692119c914f6b7bc1b068cb5809",
+    "paths": [
+      "python/sglang/srt/model_loader/loader.py",
+      "python/sglang/srt/models/qwen4_exp.py"
+    ]
   }
 ]
