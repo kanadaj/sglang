@@ -60,7 +60,7 @@ storage's existing prohibition on reloading finalized shards remains in force.
   rounding, TP2 rank/reduction seams, vision adapters, source packaging, and
   exact Bash extraction/profile comparison. **55 unittest tests total**, plus
   the actual-image CLI parser and module `--help` checks.
-- Clean ordered application reconstructs **35 changed paths** with **34 Python
+- Clean ordered application reconstructs **34 changed paths** with **34 Python
   files** syntax-checked. The image build verifies **4,390 parent source files**
   before the overlay and all **4,390 corrected installed files** afterward.
 - Anonymous registry readback verifies the tag's manifest digest, all **88 parent

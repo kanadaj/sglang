@@ -81,11 +81,10 @@
   },
   {
     "file": "0009-lil-mrope-config-mtp.patch",
-    "sha256": "13a567b890a4de0cbc8631ef68c92435ccbdefe62dd1fe20d0517fb7ff832ed3",
+    "sha256": "0b9c3f38d614c8ee1f6f875a0f85080e35d4758b8a8570e7b0b8ed4fd2d9b51c",
     "paths": [
       "python/sglang/srt/configs/model_config.py",
       "python/sglang/srt/layers/rotary_embedding/mrope_rope_index.py",
-      "python/sglang/srt/mem_cache/cpp_radix_tree/.clang-format",
       "python/sglang/srt/models/qwen3_5_mtp.py",
       "python/sglang/srt/server_args.py"
     ]

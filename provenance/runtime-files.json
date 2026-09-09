@@ -17507,7 +17507,7 @@
   "python/sglang/srt/mem_cache/cpp_radix_tree/.clang-format": {
     "sha256": "dc2a6c4be9a0951daedae7d3ba0955f2062b4f05ae165d812d1e8d3706ef6c15",
     "accepted_sha256": "dc2a6c4be9a0951daedae7d3ba0955f2062b4f05ae165d812d1e8d3706ef6c15",
-    "changed_from_day0": true
+    "changed_from_day0": false
   },
   "python/sglang/srt/mem_cache/cpp_radix_tree/common.h": {
     "sha256": "cf196b6f42e2930229fb757f0cfe9a22680424b878bfdbb06857a76e0adec4d4",

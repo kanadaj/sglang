@@ -16,7 +16,7 @@ are verified; a new standalone GPU boot/download was not performed.
 
 ## What is included
 
-- An ordered **12-patch series covering 35 changed paths**, not only the two
+- An ordered **12-patch series covering 34 changed paths**, not only the two
   latest vision files. Complete changed runtime sources and clean preimages
   are included for offline audit and reconstruction.
 - SM120 FP8 KV / GDN / online-FP8 foundation; LIL config aliases, packed loader
@@ -53,9 +53,10 @@ just selected function signatures.
 Patches 0001–0008 were recovered from the image's actual build layer and matched
 against the previous local repository. 0004 includes local edits and 0008 was
 untracked in that previous repository. 0009 captures remaining mRoPE/config/MTP
-copies and one generated `.clang-format` file (non-executable, origin not linked
-to a distinct source change). 0010 captures accepted packed PLE directly from
-the attested installed tree. 0011 is the saved vision build's exact two-file
+copies. The pinned day-0 image already supplies the matching generated
+`.clang-format`; its preimage is retained so clean reconstruction tests reject
+any drift without trying to create it again. 0010 captures accepted packed PLE
+directly from the attested installed tree. 0011 is the saved vision build's exact two-file
 source overlay. 0012 propagates the loader-resolved checkpoint identity to PLE
 pre-reads (including HF repo IDs); its new evidence is separate from the original
 vision attestation. `runtime-files.vision-v2.json` preserves the original inventory.
