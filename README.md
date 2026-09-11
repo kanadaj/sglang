@@ -12,7 +12,8 @@ private NVFP4 W4A16 draft head, NEXTN3/topk1/draft4, Mamba512/track128.
 The default `Dockerfile` additionally preserves published HF-path fix0012,
 which the actual production image does not yet contain. Both profiles include
 all earlier accepted vision/PLE/runtime fixes applicable to their ancestry.
-No production restart or image publication was performed by this Git update.
+**[Published production-source runtime: digest-pinned pull/run and audit](docs/production-image-20260911.md)**.
+The image is a clean rebuild, not a push of the private live snapshot. No production restart was performed.
 
 ## Historical published no-repo Docker quickstart
 

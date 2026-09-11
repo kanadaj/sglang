@@ -13,8 +13,10 @@ off and accepts only `0` or `1` on the untied-head path.
 Actual live image identity:
 `sha256:69f1f64c62ca2b5d919d69bcd60efb7fc89d7bf410ba406a5de586051f358465`.
 Docker's containerd-backed image `Descriptor` identifies this as an **OCI image
-index**, not a config digest. It is locally resolvable; no public registry push
-of this image was performed or verified. The durable GPUStack backend is
+index**, not a config digest. It is locally resolvable; the private snapshot
+itself was **not** pushed. A [separate clean production-source runtime is now
+published](production-image-20260911.md), with its own registry index, platform
+manifest and config digests. The durable GPUStack backend is
 `qwen-private-draft-head-20260911-v1-custom`.
 
 **Important discovery:** production still uses the earlier local-checkpoint
@@ -104,7 +106,8 @@ all88 vision-parent layer diffIDs remain a prefix of the92-layer deployed image.
 It does not expose private image Config or history commands.
 Actual two-replica output is saved in `provenance/production/live-readback.json`.
 
-Verification in this packaging task:
+Verification in the earlier source-packaging task (the subsequent image build,
+publication and CPU checks are recorded in [the image release](production-image-20260911.md)):
 - Existing baseline:39 CPU/source tests passed.
 - Updated suite:46 CPU/source tests passed; both offline profiles clean-apply.
 - New checks exercise actual helper ownership/default/invalid-gate dispatch,

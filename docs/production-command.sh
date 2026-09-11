@@ -1,4 +1,5 @@
-# Example only: do not run on occupied GPUs/ports. Build Dockerfile.production first.
+# Example only: do not run on occupied GPUs/ports. Public runtime; no build required.
+# Requires a complete local checkpoint; see production-image-20260911.md.
 docker run --rm --gpus '"device=0,1"' --ipc=host -p 127.0.0.1:30000:30000 \
   -v /absolute/path/to/local-checkpoint:/model:ro \
   -e SGLANG_ENABLE_HEALTH_ENDPOINT_GENERATION=1 \
@@ -6,7 +7,7 @@ docker run --rm --gpus '"device=0,1"' --ipc=host -p 127.0.0.1:30000:30000 \
   -e SGLANG_PLE_PACKED_NVFP4=1 \
   -e SGLANG_PLE_PACKED_FP8_REFERENCE=1 \
   -e SGLANG_PRIVATE_DRAFT_NVFP4_A16=1 \
-  --entrypoint python3 qwen-runtime:production-20260911 -m sglang.launch_server \
+  --entrypoint python3 docker.io/kanadaj/sglang-qwen38fn-sm120-turbo:production-private-draft-20260911-5413729@sha256:baf8d37cd0e6c95d6184ba6a609b410141bc3fca43db9c1c77dff1c4ba3b9421 -m sglang.launch_server \
   --model-path \
   /model \
   --enable-metrics \
