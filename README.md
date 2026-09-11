@@ -4,7 +4,17 @@ Publishable source and deployment package for the locally accepted Qwen3.8
 Flash-Next LIL NVFP4 stack. **No model weights, container archives, credentials,
 private prompts, routing snapshots or failed optimization experiments.**
 
-## No-repo Docker quickstart
+## Current production (2026-09-11)
+
+**[Exact production source, build, launch, validation and rollback](docs/production-20260911.md)**:
+private NVFP4 W4A16 draft head, NEXTN3/topk1/draft4, Mamba512/track128.
+`Dockerfile.production` reconstructs all **4,391** live SGLang source files.
+The default `Dockerfile` additionally preserves published HF-path fix0012,
+which the actual production image does not yet contain. Both profiles include
+all earlier accepted vision/PLE/runtime fixes applicable to their ancestry.
+No production restart or image publication was performed by this Git update.
+
+## Historical published no-repo Docker quickstart
 
 **[Copyable pull/run, health, text and image requests](docs/standalone.md)** —
 ordinary patched SGLang, not a defaults wrapper. The corrected HF-path vision
@@ -16,7 +26,8 @@ are verified; a new standalone GPU boot/download was not performed.
 
 ## What is included
 
-- An ordered **12-patch series covering 34 changed paths**, not only the two
+- An ordered **13-patch combined series covering 36 changed paths** (production:
+  12 patches / 35 changed paths), not only the two
   latest vision files. Complete changed runtime sources and clean preimages
   are included for offline audit and reconstruction.
 - SM120 FP8 KV / GDN / online-FP8 foundation; LIL config aliases, packed loader
@@ -26,7 +37,8 @@ are verified; a new standalone GPU boot/download was not performed.
 - Complete external YaRN2 override, optional host-side launch helper, TP2 arguments, dedicated
   GPUStack backend-version template, synthetic CPU tests and image_url example.
 - Hash inventory of **all 4,389 non-bytecode files in the accepted SGLang package**,
-  extended to **4,390** with the vision adapter. There are no unexplained missing
+  extended to **4,390** with the vision adapter and **4,391** with the private
+  draft head. There are no unexplained missing
   package paths after clean reconstruction. See `provenance/` for scope limits.
 
 This is a deployment-specific derivative, not an upstream SGLang release.
