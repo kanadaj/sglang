@@ -1,0 +1,50 @@
+{
+  "scope": "CPU integration on API12-compatible dependencies with the nine profile source files overlaid; no GPU deployment of this integrated profile",
+  "runtime_files": {
+    "python/sglang/srt/entrypoints/harmony_utils.py": "b15d48004df3d256b925380e9e5502f8f8a7437cfe0f751183ee1288dc868e8c",
+    "python/sglang/srt/entrypoints/openai/protocol.py": "942e8fb0a2fd5945f64b3014f8afd6afb840c349211c9a1fb1b36f5c8ab97afc",
+    "python/sglang/srt/entrypoints/openai/qwen_effort.py": "5c0b0f71b0a4836dd0008c31ed47313192ad89031e789785bf162a5ee83c8470",
+    "python/sglang/srt/entrypoints/openai/responses_adapters.py": "5db20d8b8065c67714ffc7643a157253f7d02c371364c14ce4bf7cb047b6cc34",
+    "python/sglang/srt/entrypoints/openai/serving_chat.py": "54e5eb135b3298d6464fbd769cf0ff97c710e0e52e1f448ea6fa1556706a589b",
+    "python/sglang/srt/entrypoints/openai/serving_responses.py": "6e722e83683f9cc97475ac1906d2cf0059b729977a27acd51c1d975f32fd5e7c",
+    "python/sglang/srt/function_call/qwen3_coder_detector.py": "ac084fd4a71f4c7fac1bcb5a1e1bccfed6365ea8f852a11c9a9288e81f00d10f",
+    "python/sglang/srt/managers/schedule_batch.py": "56b475c078d2aed7fc626dd7f41559b169498da285bf729d94b76e8abda13c42",
+    "python/sglang/srt/multimodal/processors/qwen_vl.py": "b47003e1f0840a057519adff46fc72a9318a61e2eb3ef8cedfa9eab19e98b7f7"
+  },
+  "cpu": {
+    "tests_passed": 1081,
+    "subtests_passed": 124,
+    "deselected": 3,
+    "deselected_names": [
+      "test_k2_nested_effort_selects_streaming_reasoning_delimiter",
+      "test_required_native_parser_matches_full_response",
+      "test_output_items_split_the_qualified_name"
+    ],
+    "coverage": "Responses, Chat, Messages, namespace/custom tools, stream boundaries, replay, effort, media and existing patch0014 regression tests",
+    "tokenizer_snapshot": "b8d739ed50127495b396d68082592eb1bd39e4a0"
+  },
+  "packaging": {
+    "tests_passed": 7,
+    "clean_apply_scoped_paths": 9,
+    "historical_profiles_unchanged": true
+  },
+  "live_historical": {
+    "api12": {
+      "image_cases_passed": 16,
+      "effort_cases_passed": 96,
+      "forced_tool_cases_passed": 48,
+      "progressive_streaming_cases_passed": 3
+    },
+    "limitations": [
+      "Short four-frame video chronology remains wrong in observed cases.",
+      "Six-round client workflow initially used an invented marker, recovered, completed all rounds and produced the final receipt; strict workflow test failed.",
+      "These historical live tests predate preservation of patch0014 in the two integrated API files.",
+      "No fresh GPU test, throughput benchmark or full production acceptance for this PR."
+    ]
+  },
+  "publication_scan": {
+    "new_file_or_staged_diff_findings": 0,
+    "unchanged_parent_fixture_findings": 7,
+    "unchanged_parent_fixture_file": "tests/test_diagnostics.py"
+  }
+}

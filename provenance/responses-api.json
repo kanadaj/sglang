@@ -1,0 +1,52 @@
+{
+  "profile": "production-responses-api",
+  "base_profile": "production-chat-effort",
+  "base_commit": "33c592ce0930a9b9a6b9deee444c32d8575c9faf",
+  "base_image": "docker.io/kanadaj/sglang-qwen38fn-sm120-turbo:production-chat-effort-20260913-v2@sha256:872a2bda228e39aa9c1af729b47cc28f7862e7859e448f1a8868b85a4051f404",
+  "patch": "0015-qwen-responses-effort-media.patch",
+  "patch_sha256": "46907f2019c1d908372e5edf69278c0c21127b6a15767cf703a525fda0a2554e",
+  "files": {
+    "python/sglang/srt/entrypoints/harmony_utils.py": {
+      "before": "68b50da39f22701e1046b18f539faaee3ce26d8684ca1d213ab7abb7facc39c5",
+      "after": "b15d48004df3d256b925380e9e5502f8f8a7437cfe0f751183ee1288dc868e8c"
+    },
+    "python/sglang/srt/entrypoints/openai/protocol.py": {
+      "before": "b3007a1d88e127548eca1dce13d2712123a1ecc4beb6533af41e96fd99f485a9",
+      "after": "942e8fb0a2fd5945f64b3014f8afd6afb840c349211c9a1fb1b36f5c8ab97afc"
+    },
+    "python/sglang/srt/entrypoints/openai/qwen_effort.py": {
+      "before": null,
+      "after": "5c0b0f71b0a4836dd0008c31ed47313192ad89031e789785bf162a5ee83c8470"
+    },
+    "python/sglang/srt/entrypoints/openai/responses_adapters.py": {
+      "before": null,
+      "after": "5db20d8b8065c67714ffc7643a157253f7d02c371364c14ce4bf7cb047b6cc34"
+    },
+    "python/sglang/srt/entrypoints/openai/serving_chat.py": {
+      "before": "c6228b8d8771e7136ba87404f53da2d51ee2c5c68e7cc32b7d48da9310f55427",
+      "after": "54e5eb135b3298d6464fbd769cf0ff97c710e0e52e1f448ea6fa1556706a589b"
+    },
+    "python/sglang/srt/entrypoints/openai/serving_responses.py": {
+      "before": "8ba94cc622db881a0f7cfea0bdb39b2f80965daa093d77ea6a0361f6b6f5e2ce",
+      "after": "6e722e83683f9cc97475ac1906d2cf0059b729977a27acd51c1d975f32fd5e7c"
+    },
+    "python/sglang/srt/function_call/qwen3_coder_detector.py": {
+      "before": "adf38ad60548b75559e3e6b8b7b5bd20c8da29984d9b4643623cb874b263af22",
+      "after": "ac084fd4a71f4c7fac1bcb5a1e1bccfed6365ea8f852a11c9a9288e81f00d10f"
+    },
+    "python/sglang/srt/managers/schedule_batch.py": {
+      "before": "4965156c669a536b40250605794de9d9aa7582fde71d188ab2ecf22e766e755a",
+      "after": "56b475c078d2aed7fc626dd7f41559b169498da285bf729d94b76e8abda13c42"
+    },
+    "python/sglang/srt/multimodal/processors/qwen_vl.py": {
+      "before": "7b4dc28f8aef74f8a8a26516d639b0abf4ae91ce5c5f1c863edf996868283035",
+      "after": "b47003e1f0840a057519adff46fc72a9318a61e2eb3ef8cedfa9eab19e98b7f7"
+    }
+  },
+  "upstream_api_backports": [
+    "https://github.com/sgl-project/sglang/pull/38690",
+    "https://github.com/sgl-project/sglang/pull/39174"
+  ],
+  "scope": "Responses, request-local effort, multimodal release aliases and explicit generation errors; no HiCache changes",
+  "deployment_note": "API12 supplied the nine scoped files; protocol.py and serving_chat.py additionally preserve base patch0014. Integration CPU validation is recorded separately from earlier live API12 results."
+}

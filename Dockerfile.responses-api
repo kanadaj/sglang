@@ -1,0 +1,9 @@
+# Opt-in API profile; existing production and Chat-only builds are unchanged.
+FROM docker.io/kanadaj/sglang-qwen38fn-sm120-turbo:production-chat-effort-20260913-v2@sha256:872a2bda228e39aa9c1af729b47cc28f7862e7859e448f1a8868b85a4051f404
+COPY scripts/verify_responses_api.py /tmp/responses-profile/scripts/verify_responses_api.py
+COPY provenance/production/runtime-files.json /tmp/responses-profile/provenance/production/runtime-files.json
+COPY provenance/chat-effort.json provenance/responses-api.json /tmp/responses-profile/provenance/
+COPY patches/0015-qwen-responses-effort-media.patch /tmp/responses-profile/patches/
+RUN python3 /tmp/responses-profile/scripts/verify_responses_api.py --tree /sgl-workspace/sglang --apply
+ENTRYPOINT ["python3", "-m", "sglang.launch_server"]
+CMD ["--help"]

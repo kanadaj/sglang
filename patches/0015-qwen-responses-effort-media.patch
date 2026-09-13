@@ -1,0 +1,3920 @@
+--- a/python/sglang/srt/entrypoints/harmony_utils.py
++++ b/python/sglang/srt/entrypoints/harmony_utils.py
+@@ -5,12 +5,15 @@
+ import datetime
+ import logging
+ from collections.abc import Iterable
+-from typing import Optional, Union
++from typing import Optional, Set, Union
+ 
+ import orjson
+ from openai.types.responses import (
++    ResponseCodeInterpreterToolCall,
+     ResponseOutputItem,
+-    ResponseOutputMessage,
++)
++from openai.types.responses import ResponseOutputMessage as OpenAIResponseOutputMessage
++from openai.types.responses import (
+     ResponseOutputText,
+     ResponseReasoningItem,
+ )
+@@ -43,6 +46,14 @@
+ from sglang.srt.entrypoints.openai.protocol import (
+     ReasoningEffortTier,
+     ResponseInputOutputItem,
++    ResponseNamespacedFunctionToolCall,
++    ResponseOutputMessage,
++)
++from sglang.srt.entrypoints.openai.responses_adapters import (
++    decode_reasoning_state,
++    encode_custom_tool_input,
++    namespace_members_to_chat_tools,
++    split_namespaced_call,
+ )
+ from sglang.srt.utils import random_uuid
+ 
+@@ -102,6 +113,7 @@
+         dev_msg_content = dev_msg_content.with_instructions(instructions)
+     if tools is not None:
+         function_tools = []
++        member_descriptions = []
+         for tool in tools:
+             if tool.type in (
+                 "web_search",
+@@ -112,6 +124,17 @@
+                 pass
+             elif tool.type == "function":
+                 function_tools.append(tool)
++            elif tool.type == "namespace" and tool.name:
++                # Members flatten to qualified functions, same as the chat
++                # path, but as harmony tool descriptions.
++                for member in namespace_members_to_chat_tools(tool):
++                    member_descriptions.append(
++                        ToolDescription.new(
++                            name=member.function.name,
++                            description=member.function.description or "",
++                            parameters=member.function.parameters,
++                        )
++                    )
+             else:
+                 # No harmony prompt template for the remaining built-ins;
+                 # drop them so the request still runs.
+@@ -119,15 +142,15 @@
+                     "harmony: ignoring unsupported response tool type %r",
+                     tool.type,
+                 )
+-        if function_tools:
+-            function_tool_descriptions = [
+-                ToolDescription.new(
+-                    name=tool.name,
+-                    description=tool.description,
+-                    parameters=tool.parameters,
+-                )
+-                for tool in function_tools
+-            ]
++        function_tool_descriptions = [
++            ToolDescription.new(
++                name=tool.name,
++                description=tool.description,
++                parameters=tool.parameters,
++            )
++            for tool in function_tools
++        ] + member_descriptions
++        if function_tool_descriptions:
+             dev_msg_content = dev_msg_content.with_function_tools(
+                 function_tool_descriptions
+             )
+@@ -163,37 +186,73 @@
+             # text chunk always carries the system→developer text_prefix even if
+             # earlier parts were non-text (image/audio) and got dropped.
+             text_chunks = [
+-                c for c in content if c.get("type") in ("text", "input_text")
++                c
++                for c in content
++                if c.get("type") in ("text", "input_text", "output_text")
+             ]
+             contents = [
+                 TextContent(text=(text_prefix if i == 0 else "") + c.get("text", ""))
+                 for i, c in enumerate(text_chunks)
+             ]
+             msg = Message.from_role_and_contents(role, contents)
+-    elif response_msg["type"] == "function_call_output":
++        if role == "assistant" and response_msg.get("phase") is not None:
++            msg = msg.with_channel(
++                "final" if response_msg["phase"] == "final_answer" else "commentary"
++            )
++    elif response_msg["type"] in ("function_call_output", "custom_tool_call_output"):
+         call_id = response_msg["call_id"]
+-        call_response: Optional[ResponseFunctionToolCall] = None
+-        for prev_response in reversed(prev_responses):
++        call_response = None
++        for previous in reversed(prev_responses):
++            if not isinstance(previous, dict):
++                previous = previous.model_dump()
+             if (
+-                isinstance(prev_response, ResponseFunctionToolCall)
+-                and prev_response.call_id == call_id
++                previous.get("type") in ("function_call", "custom_tool_call")
++                and previous.get("call_id") == call_id
+             ):
+-                call_response = prev_response
++                call_response = previous
+                 break
+         if call_response is None:
+             raise ValueError(f"No call message found for {call_id}")
++        output = response_msg.get("output", "")
++        if isinstance(output, list):
++            output = "".join(
++                part.get("text", "") for part in output if isinstance(part, dict)
++            )
+         msg = Message.from_author_and_content(
+-            Author.new(Role.TOOL, f"functions.{call_response.name}"),
+-            response_msg["output"],
++            Author.new(Role.TOOL, f"functions.{call_response['name']}"),
++            output,
+         )
+     elif response_msg["type"] == "reasoning":
+-        content = response_msg["content"]
+-        assert len(content) == 1
+-        msg = Message.from_role_and_content(Role.ASSISTANT, content[0]["text"])
+-    elif response_msg["type"] == "function_call":
+-        msg = Message.from_role_and_content(Role.ASSISTANT, response_msg["arguments"])
++        text = ""
++        for field in ("summary", "content"):
++            text = "\n".join(
++                part.get("text", "")
++                for part in response_msg.get(field) or []
++                if isinstance(part, dict)
++            )
++            if text:
++                break
++        if not text:
++            text = decode_reasoning_state(response_msg.get("encrypted_content")) or ""
++        msg = Message.from_role_and_content(Role.ASSISTANT, text).with_channel(
++            "analysis"
++        )
++    elif response_msg["type"] in ("function_call", "custom_tool_call"):
++        arguments = (
++            encode_custom_tool_input(response_msg.get("input") or "")
++            if response_msg["type"] == "custom_tool_call"
++            else response_msg.get("arguments") or "{}"
++        )
++        if isinstance(arguments, dict):
++            arguments = orjson.dumps(arguments).decode()
++        name = response_msg["name"]
++        namespace = response_msg.get("namespace")
++        if namespace and name:
++            # Re-qualify so the model sees the flattened name it was offered.
++            name = f"{namespace}.{name}"
++        msg = Message.from_role_and_content(Role.ASSISTANT, arguments)
+         msg = msg.with_channel("commentary")
+-        msg = msg.with_recipient(f"functions.{response_msg['name']}")
++        msg = msg.with_recipient(f"functions.{name}")
+         msg = msg.with_content_type("json")
+     else:
+         raise ValueError(f"Unknown input type: {response_msg['type']}")
+@@ -201,10 +260,13 @@
+ 
+ 
+ def parse_response_output(output: ResponseOutputItem) -> Message:
+-    if isinstance(output, ResponseOutputMessage):
++    if isinstance(output, OpenAIResponseOutputMessage):
+         role = output.role
+         contents = [TextContent(text=c.text) for c in output.content]
+         msg = Message.from_role_and_contents(role, contents)
++        phase = getattr(output, "phase", None)
++        if phase is not None:
++            msg = msg.with_channel("final" if phase == "final_answer" else "commentary")
+         return msg
+     elif isinstance(output, ResponseFunctionToolCall):
+         msg = Message.from_role_and_content(Role.ASSISTANT, output.arguments)
+@@ -244,7 +306,11 @@
+     return StreamableParser(get_encoding(), role=Role.ASSISTANT)
+ 
+ 
+-def parse_output_message(message: Message):
++def parse_output_message(
++    message: Message,
++    namespaces: Optional[Set[str]] = None,
++    declared_names: Optional[Set[str]] = None,
++):
+     if message.author.role != "assistant":
+         # This is a message from a tool to the assistant (e.g., search result).
+         # Don't include it in the final output for now. This aligns with
+@@ -282,6 +348,17 @@
+             type="web_search_call",
+         )
+         output_items.append(web_search_item)
++    elif recipient is not None and recipient.startswith("python"):
++        output_items.append(
++            ResponseCodeInterpreterToolCall(
++                id=f"ci_{random_uuid()}",
++                type="code_interpreter_call",
++                code="".join(content.text for content in message.content),
++                container_id="auto",
++                outputs=[],
++                status="completed",
++            )
++        )
+     elif message.channel == "analysis":
+         for content in message.content:
+             reasoning_item = ResponseReasoningItem(
+@@ -296,18 +373,34 @@
+                 status=None,
+             )
+             output_items.append(reasoning_item)
+-    elif message.channel == "commentary":
++    elif message.channel == "commentary" and message.recipient is not None:
+         if message.recipient.startswith("functions."):
+-            function_name = message.recipient.split(".")[-1]
++            # The recipient keeps the full dotted suffix; declared
++            # namespaces split it back onto the wire item's fields.
++            item_name, namespace = split_namespaced_call(
++                message.recipient.removeprefix("functions."),
++                namespaces or frozenset(),
++                declared_names or frozenset(),
++            )
+             for content in message.content:
+                 random_id = random_uuid()
+-                response_item = ResponseFunctionToolCall(
+-                    arguments=content.text,
+-                    call_id=f"call_{random_id}",
+-                    type="function_call",
+-                    name=function_name,
+-                    id=f"ft_{random_id}",
+-                )
++                if namespace is None:
++                    response_item = ResponseFunctionToolCall(
++                        arguments=content.text,
++                        call_id=f"call_{random_id}",
++                        type="function_call",
++                        name=item_name,
++                        id=f"ft_{random_id}",
++                    )
++                else:
++                    response_item = ResponseNamespacedFunctionToolCall(
++                        arguments=content.text,
++                        call_id=f"call_{random_id}",
++                        type="function_call",
++                        name=item_name,
++                        namespace=namespace,
++                        id=f"ft_{random_id}",
++                    )
+                 output_items.append(response_item)
+         elif message.recipient.startswith("python") or message.recipient.startswith(
+             "browser"
+@@ -327,7 +420,9 @@
+                 output_items.append(reasoning_item)
+         else:
+             raise ValueError(f"Unknown recipient: {message.recipient}")
+-    elif message.channel == "final":
++    elif message.channel == "final" or (
++        message.channel == "commentary" and message.recipient is None
++    ):
+         contents = []
+         for content in message.content:
+             output_text = ResponseOutputText(
+@@ -338,6 +433,7 @@
+             )
+             contents.append(output_text)
+         text_item = ResponseOutputMessage(
++            phase="final_answer" if message.channel == "final" else "commentary",
+             id=f"msg_{random_uuid()}",
+             content=contents,
+             role=message.author.role,
+@@ -350,7 +446,11 @@
+     return output_items
+ 
+ 
+-def parse_remaining_state(parser: StreamableParser):
++def parse_remaining_state(
++    parser: StreamableParser,
++    namespaces: Optional[Set[str]] = None,
++    declared_names: Optional[Set[str]] = None,
++):
+     if not parser.current_content:
+         return []
+     if parser.current_role != Role.ASSISTANT:
+@@ -359,6 +459,17 @@
+     if current_recipient is not None and current_recipient.startswith("browser."):
+         return []
+ 
++    if current_recipient is not None and current_recipient.startswith("python"):
++        return [
++            ResponseCodeInterpreterToolCall(
++                id=f"ci_{random_uuid()}",
++                type="code_interpreter_call",
++                code=parser.current_content,
++                container_id="auto",
++                outputs=[],
++                status="in_progress",
++            )
++        ]
+     if parser.current_channel == "analysis":
+         reasoning_item = ResponseReasoningItem(
+             id=f"rs_{random_uuid()}",
+@@ -372,7 +483,38 @@
+             status=None,
+         )
+         return [reasoning_item]
+-    elif parser.current_channel == "final":
++    elif current_recipient is not None and current_recipient.startswith("functions."):
++        random_id = random_uuid()
++        item_name, namespace = split_namespaced_call(
++            current_recipient.removeprefix("functions."),
++            namespaces or frozenset(),
++            declared_names or frozenset(),
++        )
++        if namespace is None:
++            return [
++                ResponseFunctionToolCall(
++                    id=f"ft_{random_id}",
++                    call_id=f"call_{random_id}",
++                    type="function_call",
++                    name=item_name,
++                    arguments=parser.current_content,
++                    status="in_progress",
++                )
++            ]
++        return [
++            ResponseNamespacedFunctionToolCall(
++                id=f"ft_{random_id}",
++                call_id=f"call_{random_id}",
++                type="function_call",
++                name=item_name,
++                namespace=namespace,
++                arguments=parser.current_content,
++                status="in_progress",
++            )
++        ]
++    elif parser.current_channel == "final" or (
++        parser.current_channel == "commentary" and current_recipient is None
++    ):
+         output_text = ResponseOutputText(
+             text=parser.current_content,
+             annotations=[],  # TODO
+@@ -380,6 +522,7 @@
+             logprobs=None,  # TODO
+         )
+         text_item = ResponseOutputMessage(
++            phase="final_answer" if parser.current_channel == "final" else "commentary",
+             id=f"msg_{random_uuid()}",
+             content=[output_text],
+             role="assistant",
+--- a/python/sglang/srt/entrypoints/openai/protocol.py
++++ b/python/sglang/srt/entrypoints/openai/protocol.py
+@@ -18,6 +18,7 @@
+ import logging
+ import time
+ import uuid
++from collections.abc import Iterable
+ from dataclasses import dataclass
+ from typing import (
+     Annotated,
+@@ -39,11 +40,16 @@
+     ResponseFunctionToolCall,
+     ResponseInputItemParam,
+     ResponseOutputItem,
+-    ResponseOutputMessage,
++    ResponseOutputItemAddedEvent,
++    ResponseOutputItemDoneEvent,
++)
++from openai.types.responses import ResponseOutputMessage as OpenAIResponseOutputMessage
++from openai.types.responses import (
+     ResponseOutputText,
+     ResponseReasoningItem,
+     ResponseTextConfig,
+ )
++from openai.types.responses.easy_input_message_param import EasyInputMessageParam
+ from openai.types.responses.response import ToolChoice
+ from openai.types.responses.response_format_text_json_schema_config import (
+     ResponseFormatTextJSONSchemaConfig,
+@@ -628,6 +634,7 @@
+     )
+     tool_call_id: Optional[str] = None
+     name: Optional[str] = None
++    phase: Optional[Literal["commentary", "final_answer"]] = None
+     reasoning_content: Optional[str] = None
+     tool_calls: Optional[List[ToolCall]] = Field(default=None, examples=[None])
+     tools: Optional[List[Tool]] = Field(default=None, examples=[None])
+@@ -1483,6 +1490,9 @@
+     strict: bool = False
+     # Inner schemas for ``namespace`` tools.
+     tools: Optional[List[Dict[str, Any]]] = None
++    # Input format of a ``custom`` tool: {"type": "text"} or
++    # {"type": "grammar", "syntax": ..., "definition": ...}.
++    format: Optional[Dict[str, Any]] = None
+ 
+     @model_validator(mode="after")
+     def validate_function_tool(self) -> ResponseTool:
+@@ -1491,7 +1501,48 @@
+         return self
+ 
+ 
++class ResponseInputMessageParam(EasyInputMessageParam, total=False):
++    phase: Optional[Literal["commentary", "final_answer"]]
++
++
++class ResponseOutputMessage(OpenAIResponseOutputMessage):
++    phase: Optional[Literal["commentary", "final_answer"]] = None
++
++
++class ResponseNamespacedFunctionToolCall(ResponseFunctionToolCall):
++    """A ``function_call`` emitted for a ``namespace`` tool declaration.
++
++    The chat pipeline only sees the qualified ``{namespace}.{name}``
++    function, so the split pair has to travel back on the item itself.
++    """
++
++    namespace: str
++
++
++# Streaming events and response payloads type ``item``/``output`` through the
++# SDK unions, whose ``ResponseFunctionToolCall`` arm serializes a subclass
++# instance and drops ``namespace``; the subclasses below widen the union with
++# the namespaced arm first so the field survives model_dump.
++class ResponseNamespacedOutputItemAddedEvent(ResponseOutputItemAddedEvent):
++    item: Union[ResponseNamespacedFunctionToolCall, ResponseOutputItem]
++
++
++class ResponseNamespacedOutputItemDoneEvent(ResponseOutputItemDoneEvent):
++    item: Union[ResponseNamespacedFunctionToolCall, ResponseOutputItem]
++
++
++ResponsesOutputItem = Union[
++    ResponseOutputMessage,
++    ResponseOutputItem,
++    ResponseReasoningItem,
++    ResponseNamespacedFunctionToolCall,
++    ResponseFunctionToolCall,
++]
++
++
+ ResponseInputOutputItem: TypeAlias = Union[
++    ResponseInputMessageParam,
++    ResponseOutputMessage,
+     ResponseInputItemParam,
+     "ResponseReasoningItem",
+     ResponseFunctionToolCall,
+@@ -1626,16 +1677,41 @@
+         if isinstance(item.get("id"), str) and item.get("content") is not None:
+             item = {k: v for k, v in item.items() if k != "id"}
+ 
+-        content = item.get("content")
++        field = (
++            "output"
++            if item.get("type") in ("function_call_output", "custom_tool_call_output")
++            else "content"
++        )
++        content = item.get(field)
+         if not isinstance(content, list):
+             return item
+ 
+         item = dict(item)
+-        item["content"] = [
++        item[field] = [
+             ResponsesRequest._normalize_content_part_for_validation(part)
+             for part in content
+         ]
+         return item
++
++    @field_validator("input", mode="after")
++    @classmethod
++    def materialize_tool_outputs(cls, value):
++        # SDK Iterable fields validate lazily; persist them before logging or replay.
++        if not isinstance(value, list):
++            return value
++        result = []
++        for item in value:
++            if isinstance(item, dict) and item.get("type") in (
++                "function_call_output",
++                "custom_tool_call_output",
++            ):
++                output = item.get("output")
++                if isinstance(output, Iterable) and not isinstance(
++                    output, (str, bytes, dict, list)
++                ):
++                    item = {**item, "output": list(output)}
++            result.append(item)
++        return result
+ 
+     @staticmethod
+     def _normalize_content_part_for_validation(part):
+@@ -1667,20 +1743,28 @@
+     def is_include_output_logprobs(self) -> bool:
+         return bool(self.include and "message.output_text.logprobs" in self.include)
+ 
++    def is_include_encrypted_reasoning(self) -> bool:
++        return bool(self.include and "reasoning.encrypted_content" in self.include)
++
+     def has_json_schema_constraint(self) -> bool:
+         return self._json_schema_from_text_format(self.text) is not None
+ 
+     def effective_tool_choice(self) -> Union[str, Dict[str, Any]]:
+         """``tool_choice`` reduced to what the server can actually honor: of the
+-        object forms only a named ``function`` survives, the rest (web_search,
+-        mcp, ...) can't be forced through the tool-call parser."""
++        object forms only a named ``function`` / ``custom`` tool survives (a
++        ``namespace`` field re-qualifies the inner name to the flattened form
++        the model saw), the rest (web_search, mcp, ...) can't be forced
++        through the tool-call parser."""
+         tool_choice = self.tool_choice
+         if not isinstance(tool_choice, dict):
+             return tool_choice
+         name = tool_choice.get("name") or (tool_choice.get("function") or {}).get(
+             "name"
+         )
+-        if tool_choice.get("type") == "function" and name:
++        namespace = tool_choice.get("namespace")
++        if namespace and name:
++            name = f"{namespace}.{name}"
++        if tool_choice.get("type") in ("function", "custom") and name:
+             return {"type": "function", "name": name}
+         return "auto"
+ 
+@@ -1781,9 +1865,7 @@
+     created_at: int = Field(default_factory=lambda: int(time.time()))
+     model: str
+ 
+-    output: List[
+-        Union[ResponseOutputItem, ResponseReasoningItem, ResponseFunctionToolCall]
+-    ] = Field(default_factory=list)
++    output: List[ResponsesOutputItem] = Field(default_factory=list)
+     status: Literal[
+         "queued", "in_progress", "completed", "incomplete", "failed", "cancelled"
+     ]
+@@ -1842,7 +1924,12 @@
+         model_name: str,
+         created_time: int,
+         output: List[
+-            Union[ResponseOutputItem, ResponseReasoningItem, ResponseFunctionToolCall]
++            Union[
++                ResponseOutputMessage,
++                ResponseOutputItem,
++                ResponseReasoningItem,
++                ResponseFunctionToolCall,
++            ]
+         ],
+         status: str,
+         usage: Optional[UsageInfo],
+@@ -1868,7 +1955,7 @@
+                 try:
+                     if isinstance(it, ResponseOutputText):
+                         continue
+-                    elif isinstance(it, ResponseOutputMessage):
++                    elif isinstance(it, OpenAIResponseOutputMessage):
+                         if not it.content:
+                             continue
+                         for c in it.content:
+@@ -1967,7 +2054,11 @@
+ 
+ 
+ ResponseInputOutputItem: TypeAlias = Union[
+-    ResponseInputItemParam, "ResponseReasoningItem", ResponseFunctionToolCall
++    ResponseInputMessageParam,
++    ResponseOutputMessage,
++    ResponseInputItemParam,
++    "ResponseReasoningItem",
++    ResponseFunctionToolCall,
+ ]
+ 
+ 
+--- /dev/null
++++ b/python/sglang/srt/entrypoints/openai/qwen_effort.py
+@@ -0,0 +1,32 @@
++"""Request-local effort compatibility for this dedicated Qwen3.8FN image.
++
++No model weights, global configuration or shared default dictionaries are mutated.
++All three API adapters converge on ChatCompletionRequest before template rendering.
++"""
++
++ALIASES = {"minimal": "low", "high": "xhigh", "max": "xhigh"}
++LEVELS = {"none", "minimal", "low", "medium", "high", "xhigh", "max"}
++
++
++def normalize_qwen_effort(request, defaults):
++    defaults = defaults or {}
++    explicit = dict(request.chat_template_kwargs or {})
++    effort = explicit.get("reasoning_effort")
++    if effort is None:
++        effort = request.reasoning_effort
++    if effort is None:
++        effort = defaults.get("reasoning_effort", "medium")
++    if not isinstance(effort, str) or effort not in LEVELS:
++        raise ValueError(f"Unsupported Qwen reasoning effort: {effort!r}")
++    if effort == "none" and explicit.get("enable_thinking") is True:
++        raise ValueError("reasoning effort 'none' conflicts with enable_thinking=true")
++    merged = dict(defaults)
++    merged.update(explicit)
++    effort = ALIASES.get(effort, effort)
++    # Explicit disable (including the Anthropic adapter's native thinking toggle)
++    # always stays off, even if the client also supplies an output effort level.
++    if effort == "none":
++        merged["enable_thinking"] = False
++    merged["reasoning_effort"] = effort
++    request.reasoning_effort = effort
++    request.chat_template_kwargs = merged
+--- /dev/null
++++ b/python/sglang/srt/entrypoints/openai/responses_adapters.py
+@@ -0,0 +1,335 @@
++# SPDX-License-Identifier: Apache-2.0
++"""Translations between Responses-API wire shapes and SGLang's chat internals.
++
++Three things the Responses API expresses that the chat-completions path has no
++representation for:
++
++* ``custom`` tools, whose payload is freeform text rather than JSON-object
++  arguments. Each is surfaced to the model as a function tool with a single
++  string property, and the resulting call is translated back into a
++  ``custom_tool_call``.
++* ``namespace`` tools, which group inner function schemas. Each member is
++  surfaced as a qualified function the model can call; Qwen uses flat aliases.
++  The emitted call restores the canonical ``name`` plus ``namespace``.
++* ``reasoning.encrypted_content``, the opaque blob a ``store=false`` client
++  replays to hand a reasoning trace back to the server.
++"""
++
++from __future__ import annotations
++
++import base64
++import hashlib
++import json
++import re
++import zlib
++from collections import Counter
++from typing import Any, Dict, List, Optional, Set, Tuple
++
++from sglang.srt.entrypoints.openai.protocol import Function, Tool
++
++CUSTOM_TOOL_INPUT_KEY = "input"
++
++_SIMPLE_ESCAPES = {
++    '"': '"',
++    "\\": "\\",
++    "/": "/",
++    "b": "\b",
++    "f": "\f",
++    "n": "\n",
++    "r": "\r",
++    "t": "\t",
++}
++
++
++def custom_tool_parameters() -> Dict[str, Any]:
++    return {
++        "type": "object",
++        "properties": {
++            CUSTOM_TOOL_INPUT_KEY: {
++                "type": "string",
++                "description": "The freeform text payload for this tool.",
++            }
++        },
++        "required": [CUSTOM_TOOL_INPUT_KEY],
++        "additionalProperties": False,
++    }
++
++
++def custom_tool_description(
++    description: Optional[str], tool_format: Optional[Dict[str, Any]]
++) -> Optional[str]:
++    """Fold a custom tool's description and its input format into one blob.
++
++    A ``grammar`` format is described to the model rather than enforced by the
++    grammar backend: the payload is emitted inside the model's own tool-call
++    envelope, so constrained decoding cannot be scoped to it.
++    """
++    parts = []
++    if description:
++        parts.append(description)
++    if isinstance(tool_format, dict) and tool_format.get("type") == "grammar":
++        syntax = tool_format.get("syntax") or "lark"
++        definition = tool_format.get("definition") or ""
++        parts.append(
++            f"The payload must conform to this {syntax} grammar:\n{definition}"
++        )
++    return "\n\n".join(parts) or None
++
++
++def custom_tool_names(tools: Any) -> Set[str]:
++    return {tool.name for tool in tools or [] if tool.type == "custom" and tool.name}
++
++
++def encode_custom_tool_input(payload: str) -> str:
++    return json.dumps({CUSTOM_TOOL_INPUT_KEY: payload}, ensure_ascii=False)
++
++
++def decode_custom_tool_input(arguments: str) -> str:
++    """Recover the payload from a completed shim call's arguments.
++
++    Falls back to the raw string so a model that ignored the wrapper and
++    emitted bare text still produces a usable call.
++    """
++    try:
++        parsed = json.loads(arguments)
++    except ValueError:
++        return arguments
++    if isinstance(parsed, dict):
++        value = parsed.get(CUSTOM_TOOL_INPUT_KEY)
++        if isinstance(value, str):
++            return value
++        if len(parsed) == 1:
++            only = next(iter(parsed.values()))
++            if isinstance(only, str):
++                return only
++    return arguments
++
++
++def _payload_start(buffer: str) -> Optional[int]:
++    key = f'"{CUSTOM_TOOL_INPUT_KEY}"'
++    key_at = buffer.find(key)
++    if key_at < 0:
++        return None
++    colon = buffer.find(":", key_at + len(key))
++    if colon < 0:
++        return None
++    quote = buffer.find('"', colon + 1)
++    return quote + 1 if quote >= 0 else None
++
++
++def _unicode_escape(buffer: str, i: int) -> Optional[Tuple[str, int]]:
++    if i + 6 > len(buffer):
++        return None
++    try:
++        code = int(buffer[i + 2 : i + 6], 16)
++    except ValueError:
++        return None
++    if not 0xD800 <= code <= 0xDBFF:
++        return chr(code), i + 6
++    if i + 12 > len(buffer) or buffer[i + 6 : i + 8] != "\\u":
++        return None
++    try:
++        low = int(buffer[i + 8 : i + 12], 16)
++    except ValueError:
++        return None
++    if not 0xDC00 <= low <= 0xDFFF:
++        return None
++    return chr(0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00)), i + 12
++
++
++def decode_custom_tool_input_prefix(buffer: str) -> str:
++    """Longest fully decodable prefix of the payload in a partial argument buffer.
++
++    Streaming tool-call parsers hand out argument JSON in fragments, so the
++    payload is un-escaped incrementally to keep ``custom_tool_call_input``
++    deltas in step with the value the item finally reports.
++    """
++    start = _payload_start(buffer)
++    if start is None:
++        return ""
++    out = []
++    i, n = start, len(buffer)
++    while i < n:
++        ch = buffer[i]
++        if ch == '"':
++            break
++        if ch != "\\":
++            out.append(ch)
++            i += 1
++            continue
++        if i + 1 >= n:
++            break
++        simple = _SIMPLE_ESCAPES.get(buffer[i + 1])
++        if simple is not None:
++            out.append(simple)
++            i += 2
++            continue
++        if buffer[i + 1] == "u":
++            decoded = _unicode_escape(buffer, i)
++            if decoded is None:
++                break
++            out.append(decoded[0])
++            i = decoded[1]
++            continue
++        break
++    return "".join(out)
++
++
++def namespace_tool_names(tools: Any) -> Set[str]:
++    """Declared ``namespace`` prefixes; only these split on the way out."""
++    return {tool.name for tool in tools or [] if tool.type == "namespace" and tool.name}
++
++
++class NamespaceToolAliases:
++    """An exact, request-local bridge to flat names for Qwen function prompts."""
++
++    def __init__(self, tools: Any):
++        identities = set()
++        reserved = {
++            tool.name
++            for tool in tools or []
++            if tool.type in ("function", "custom") and tool.name
++        }
++        for tool in tools or []:
++            if tool.type != "namespace" or not tool.name:
++                continue
++            for member in tool.tools or []:
++                name = member.get("name") if isinstance(member, dict) else None
++                if not isinstance(name, str) or not name:
++                    raise ValueError(
++                        f"namespace tool {tool.name!r} has an inner tool without a name."
++                    )
++                identities.add((tool.name, name))
++        bases = {identity: f"{identity[0]}__{identity[1]}" for identity in identities}
++        counts = Counter(bases.values())
++        self.by_identity = {
++            identity: base
++            for identity, base in bases.items()
++            if counts[base] == 1
++            and base not in reserved
++            and re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", base)
++        }
++        # Reserve natural spellings before allocating collision suffixes.
++        reserved.update(self.by_identity.values())
++        for identity in sorted(identities - self.by_identity.keys()):
++            readable = re.sub(r"[^a-zA-Z0-9_-]", "_", bases[identity])[:47]
++            attempt = 0
++            while True:
++                key = json.dumps([*identity, attempt], ensure_ascii=True).encode()
++                alias = readable + "_" + hashlib.sha256(key).hexdigest()[:16]
++                if alias not in reserved:
++                    break
++                attempt += 1
++            self.by_identity[identity] = alias
++            reserved.add(alias)
++        self.by_alias = {
++            alias: identity for identity, alias in self.by_identity.items()
++        }
++
++    def encode(self, namespace: str, name: str) -> str:
++        # Removed historical tools keep their original spelling in replay.
++        return self.by_identity.get((namespace, name), f"{namespace}.{name}")
++
++
++def namespace_members_to_chat_tools(
++    tool: Any, aliases: Optional[NamespaceToolAliases] = None
++) -> List[Any]:
++    """Flatten one ``namespace`` declaration into chat function tools named
++    ``{namespace}.{member}``, or the supplied exact alias.
++
++    Inner description and strict flags survive; the namespace description
++    fills members that omit one, the way OpenAI documents the grouping.
++    """
++    members = []
++    for inner in tool.tools or []:
++        inner_name = inner.get("name") if isinstance(inner, dict) else None
++        if not isinstance(inner_name, str) or not inner_name:
++            raise ValueError(
++                f"namespace tool {tool.name!r} has an inner tool without a name."
++            )
++        members.append(
++            Tool(
++                type="function",
++                function=Function(
++                    name=(
++                        aliases.encode(tool.name, inner_name)
++                        if aliases is not None
++                        else f"{tool.name}.{inner_name}"
++                    ),
++                    description=inner.get("description") or tool.description,
++                    parameters=inner.get("parameters"),
++                    strict=bool(inner.get("strict", False)),
++                ),
++            )
++        )
++    return members
++
++
++def split_namespaced_call(
++    name: str,
++    namespaces: Set[str],
++    declared_names: Set[str],
++    aliases: Optional[NamespaceToolAliases] = None,
++) -> Tuple[str, Optional[str]]:
++    """Map one model-facing call name onto its wire-item fields.
++
++    Returns ``(name, namespace)``. An exact declaration outranks a prefix
++    split, so a plain function whose name contains a dot is never
++    reinterpreted; undeclared dotted names pass through unchanged.
++    """
++    if name not in declared_names:
++        if aliases is not None and name in aliases.by_alias:
++            namespace, inner = aliases.by_alias[name]
++            return inner, namespace
++        namespace, _, inner = name.partition(".")
++        if namespace in namespaces and inner:
++            return inner, namespace
++    return name, None
++
++
++DEVELOPER_BLOCK_LABEL = "Developer instructions:"
++
++
++def label_developer_content(content: Any) -> Any:
++    """Prefix a ``developer`` message's text with its tier label.
++
++    Chat templates recognize system/user/assistant/tool, so a developer message
++    collapses to ``system``. Labelling the block keeps the tier legible instead
++    of flattening it into the surrounding instructions, where a model can read
++    it as one more conversational turn and let a later user message win.
++    """
++    if isinstance(content, str):
++        return f"{DEVELOPER_BLOCK_LABEL}\n{content}"
++    if isinstance(content, list):
++        for index, part in enumerate(content):
++            if isinstance(part, dict) and isinstance(part.get("text"), str):
++                labelled = dict(part)
++                labelled["text"] = f"{DEVELOPER_BLOCK_LABEL}\n{part['text']}"
++                return [*content[:index], labelled, *content[index + 1 :]]
++        return [{"type": "input_text", "text": DEVELOPER_BLOCK_LABEL}, *content]
++    return content
++
++
++_REASONING_STATE_PREFIX = "sglang-reasoning-v1."
++
++
++def encode_reasoning_state(text: str) -> str:
++    """Pack a reasoning trace into the blob ``reasoning.encrypted_content`` carries.
++
++    A ``store=false`` client replays reasoning items verbatim, so the trace has
++    to survive the round trip without server-side state. SGLang holds no key,
++    so this is an encoded -- not cryptographically protected -- payload: treat
++    it as opaque to clients, not as a confidentiality boundary.
++    """
++    packed = base64.urlsafe_b64encode(zlib.compress(text.encode("utf-8")))
++    return _REASONING_STATE_PREFIX + packed.decode("ascii")
++
++
++def decode_reasoning_state(blob: Any) -> Optional[str]:
++    if not isinstance(blob, str) or not blob.startswith(_REASONING_STATE_PREFIX):
++        return None
++    try:
++        raw = base64.urlsafe_b64decode(blob[len(_REASONING_STATE_PREFIX) :])
++        return zlib.decompress(raw).decode("utf-8")
++    except (ValueError, zlib.error, UnicodeDecodeError):
++        return None
+--- a/python/sglang/srt/entrypoints/openai/serving_chat.py
++++ b/python/sglang/srt/entrypoints/openai/serving_chat.py
+@@ -65,6 +65,10 @@
+ from sglang.srt.environ import envs
+ from sglang.srt.function_call.core_types import ToolCallItem
+ from sglang.srt.function_call.function_call_parser import FunctionCallParser
++from sglang.srt.function_call.qwen3_coder_detector import (
++    IncompleteQwen3CoderToolCall,
++    Qwen3CoderParseError,
++)
+ from sglang.srt.function_call.json_array_parser import JsonArrayParser
+ from sglang.srt.function_call.utils import (
+     get_json_schema_constraint,
+@@ -1059,11 +1063,15 @@
+         request_first_reasoning_effort: bool = False,
+     ) -> MessageProcessingResult:
+         """Process chat messages and apply chat template"""
+-        if self.default_chat_template_kwargs:
++        from sglang.srt.entrypoints.openai.qwen_effort import normalize_qwen_effort
++
++        model_type = getattr(self.tokenizer_manager.model_config.hf_config, "model_type", "")
++        if model_type in ("qwen3_8_flash_next", "qwen3_8_flash_next_text", "qwen4_exp"):
++            normalize_qwen_effort(request, self.default_chat_template_kwargs)
++        elif self.default_chat_template_kwargs:
+             ctk = dict(request.chat_template_kwargs or {})
+             for k, v in self.default_chat_template_kwargs.items():
+-                # Chat normalized both explicit forms; do not reinsert a default
+-                # over that choice. Direct Responses/tokenize keep their policy.
++                # Preserve patch 0014's Chat-only precedence for other models.
+                 if (
+                     request_first_reasoning_effort
+                     and k == "reasoning_effort"
+@@ -1592,16 +1600,17 @@
+                     # to the normal chunk path, matching the non-stream behavior
+                     # in tokenizer_manager._handle_abort_finish_reason.
+                     if finish_reason_type == "abort" and isinstance(
+-                        finish_reason.get("status_code"), HTTPStatus
++                        finish_reason.get("status_code"), int
+                     ):
+-                        code = finish_reason["status_code"]
++                        code = HTTPStatus(finish_reason["status_code"])
+                         error = self.create_streaming_error_response(
+                             finish_reason.get("message", "Generation aborted."),
+                             code.name,
+                             code.value,
+                         )
+                         yield f"data: {error}\n\n"
+-                        break
++                        yield "data: [DONE]\n\n"
++                        return
+                     finish_reasons[index] = finish_reason
+ 
+                 # First chunk with role
+@@ -1737,6 +1746,11 @@
+                 )
+                 yield f"data: {usage_chunk.model_dump_json()}\n\n"
+ 
++        except Qwen3CoderParseError as e:
++            error = self.create_streaming_error_response(
++                str(e), "InternalServerError", HTTPStatus.INTERNAL_SERVER_ERROR
++            )
++            yield f"data: {error}\n\n"
+         except ValueError as e:
+             if not stream_started:
+                 raise
+@@ -1762,11 +1776,16 @@
+         if not isinstance(ret, list):
+             ret = [ret]
+ 
+-        response = self._build_chat_response(
+-            request,
+-            ret,
+-            int(time.time()),
+-        )
++        try:
++            response = self._build_chat_response(
++                request,
++                ret,
++                int(time.time()),
++            )
++        except Qwen3CoderParseError as e:
++            return self.create_error_response(
++                str(e), "InternalServerError", HTTPStatus.INTERNAL_SERVER_ERROR
++            )
+ 
+         return response
+ 
+@@ -2054,6 +2073,14 @@
+                         finish_reason["type"] = "tool_calls"
+                         finish_reason["matched"] = None
+                     return ToolCallProcessingResult(tool_calls, text, finish_reason)
++                except IncompleteQwen3CoderToolCall as e:
++                    if finish_reason.get("type") == "length":
++                        return ToolCallProcessingResult(
++                            None, e.normal_text, finish_reason
++                        )
++                    raise
++                except Qwen3CoderParseError:
++                    raise
+                 except Exception as e:
+                     logger.error(f"Tool call parsing error: {e}")
+                     return ToolCallProcessingResult(None, text, finish_reason)
+@@ -2444,7 +2471,12 @@
+         else:
+             normal_text, calls = parser.parse_stream_chunk(delta)
+             if flush:
+-                end_text, end_calls = parser.parse_stream_end()
++                try:
++                    end_text, end_calls = parser.parse_stream_end()
++                except IncompleteQwen3CoderToolCall:
++                    if content["meta_info"]["finish_reason"]["type"] == "length":
++                        return
++                    raise
+                 normal_text = (normal_text or "") + end_text
+                 calls = list(calls) + end_calls
+ 
+--- a/python/sglang/srt/entrypoints/openai/serving_responses.py
++++ b/python/sglang/srt/entrypoints/openai/serving_responses.py
+@@ -7,6 +7,7 @@
+ import asyncio
+ import json
+ import logging
++import re
+ import time
+ from contextlib import AsyncExitStack
+ from http import HTTPStatus
+@@ -15,13 +16,13 @@
+ import jinja2
+ import openai.types.responses as openai_responses_types
+ import orjson
+-from fastapi import Request
++from fastapi import HTTPException, Request
+ from fastapi.responses import ORJSONResponse
+ from openai.types.responses import (
+-    ResponseOutputMessage,
+     ResponseOutputText,
+     ResponseReasoningItem,
+ )
++from openai.types.responses.response_custom_tool_call import ResponseCustomToolCall
+ from openai.types.responses.response_function_tool_call import ResponseFunctionToolCall
+ from openai.types.responses.response_output_text import Logprob, LogprobTopLogprob
+ from openai.types.responses.response_reasoning_item import (
+@@ -61,15 +62,38 @@
+     MessageProcessingResult,
+     PromptTokenUsageInfo,
+     RequestResponseMetadata,
++    ResponseNamespacedFunctionToolCall,
++    ResponseNamespacedOutputItemAddedEvent,
++    ResponseNamespacedOutputItemDoneEvent,
++    ResponseOutputMessage,
+     ResponsesRequest,
+     ResponsesResponse,
+     Tool,
+     UsageInfo,
+ )
++from sglang.srt.entrypoints.openai.responses_adapters import (
++    NamespaceToolAliases,
++    custom_tool_description,
++    custom_tool_names,
++    custom_tool_parameters,
++    decode_custom_tool_input,
++    decode_custom_tool_input_prefix,
++    decode_reasoning_state,
++    encode_custom_tool_input,
++    encode_reasoning_state,
++    label_developer_content,
++    namespace_members_to_chat_tools,
++    namespace_tool_names,
++    split_namespaced_call,
++)
+ from sglang.srt.entrypoints.openai.serving_chat import OpenAIServingChat
+ from sglang.srt.entrypoints.openai.tool_server import MCPToolServer, ToolServer
+ from sglang.srt.entrypoints.openai.utils import to_openai_style_logprobs
+ from sglang.srt.function_call.function_call_parser import FunctionCallParser
++from sglang.srt.function_call.qwen3_coder_detector import (
++    IncompleteQwen3CoderToolCall,
++    Qwen3CoderParseError,
++)
+ from sglang.srt.function_call.json_array_parser import JsonArrayParser
+ from sglang.srt.managers.io_struct import GenerateReqInput
+ from sglang.srt.parser.reasoning_parser import ReasoningParser
+@@ -185,9 +209,7 @@
+         # Message storage for conversation continuity
+         # Note: In production, this should use a proper storage backend (Redis, database)
+         # with TTL/expiration to prevent memory leaks
+-        self.msg_store: dict[
+-            str, Union[list[ChatCompletionMessageParam], list[OpenAIMessage]]
+-        ] = {}
++        self.msg_store: dict[str, Union[list[dict], list[OpenAIMessage]]] = {}
+ 
+         self.background_tasks: dict[str, asyncio.Task] = {}
+ 
+@@ -231,6 +253,33 @@
+     def _request_id_prefix(self) -> str:
+         return "resp_"
+ 
++    def _known_model_names(self) -> set[str]:
++        """Model ids a caller may address, mirroring what ``/v1/models`` lists."""
++        names = {self.tokenizer_manager.served_model_name}
++        registry = getattr(self.tokenizer_manager, "lora_registry", None)
++        if registry is not None:
++            names.update(registry.get_all_adapters().keys())
++        return names
++
++    def _validate_model(self, model: Optional[str]) -> Optional[ORJSONResponse]:
++        """Reject an unknown ``model``, as the Responses API does.
++
++        ``None`` means "whatever is loaded". A LoRA adapter may be addressed
++        either by name or through the ``base-model:adapter`` form.
++        """
++        if model is None:
++            return None
++        base_model, _ = self._parse_model_parameter(model)
++        known = self._known_model_names()
++        if model in known or base_model in known:
++            return None
++        return self.create_error_response(
++            message=f"The model '{model}' does not exist",
++            err_type="invalid_request_error",
++            status_code=HTTPStatus.NOT_FOUND,
++            param="model",
++        )
++
+     async def create_responses(
+         self,
+         request: ResponsesRequest,
+@@ -240,17 +289,45 @@
+         if not self.tokenizer_manager:
+             return self.create_error_response("Model not loaded")
+ 
++        model_error = self._validate_model(request.model)
++        if model_error is not None:
++            return model_error
++
+         # FIXME: If the engine is dead, raise an error
+         # This is required for the streaming case
+ 
+-        # ``tool_choice="required"`` only works with ``function`` tools.
++        # ``tool_choice="required"`` needs a tool the parser can actually force;
++        # ``namespace`` members flatten down to functions like ``custom`` does.
+         if request.tool_choice == "required" and not any(
+-            tool.type == "function" for tool in (request.tools or [])
++            tool.type in ("function", "custom", "namespace")
++            for tool in (request.tools or [])
+         ):
+             return self.create_error_response(
+                 'tool_choice="required" requires at least one tool with '
+-                'type="function"; other built-in tool types cannot be forced.'
+-            )
++                'type="function", type="custom" or type="namespace"; other '
++                "built-in tool types cannot be forced."
++            )
++
++        try:
++            namespace_aliases = self._qwen_namespace_aliases(request)
++            tool_choice = self._model_tool_choice(request, namespace_aliases)
++        except (ValueError, TypeError) as e:
++            return self.create_error_response(str(e), param="tool_choice")
++        if isinstance(tool_choice, dict):
++            # Validate against the qualified names the model will actually see.
++            try:
++                declared_tools = self._response_tools_to_chat_tools(
++                    request, namespace_aliases
++                )
++            except (ValueError, TypeError) as e:
++                return self.create_error_response(str(e), param="tools")
++            if not any(
++                tool.function.name == tool_choice["name"] for tool in declared_tools
++            ):
++                return self.create_error_response(
++                    f"Tool {tool_choice['name']!r} is not declared in tools",
++                    param="tool_choice",
++                )
+ 
+         # harmony emits raw tokens; per-token logprobs aren't wired there.
+         if self.use_harmony and request.is_include_output_logprobs():
+@@ -333,8 +410,7 @@
+             )
+         ):
+             return self.create_error_response(
+-                "MCP tool server is not supported in background mode and "
+-                "streaming mode"
++                "MCP tool server is not supported in background mode and streaming mode"
+             )
+ 
+         # Schedule the request and get the result generator
+@@ -394,6 +470,8 @@
+                             else None
+                         ),
+                     )
++                    # Backport: this pinned runtime predates per-request reasoning
++                    # end-token sampling metadata; retain its existing parser path.
+                     # _process_messages set skip_special_tokens on a chat_request
+                     # we then discard, so re-apply it to the engine sampling dict.
+                     if processed_messages is not None and (
+@@ -479,7 +557,11 @@
+ 
+             # Store the input messages
+             if request.store:
+-                self.msg_store[request.request_id] = messages
++                self.msg_store[request.request_id] = (
++                    messages[2:]
++                    if self.use_harmony
++                    else self._response_input_history(request)
++                )
+ 
+             if request.background and not request.stream:
+                 created_time = int(time.time())
+@@ -565,14 +647,17 @@
+     ):
+         messages = self._construct_input_messages(request, prev_response)
+ 
+-        chat_tools = self._response_tools_to_chat_tools(request)
++        namespace_aliases = self._qwen_namespace_aliases(request)
++        chat_tools = self._response_tools_to_chat_tools(request, namespace_aliases)
+         chat_request = ChatCompletionRequest(
+             model=request.model,
+             messages=messages,
+             stream=request.stream,
+             tools=chat_tools or None,
+             tool_choice=(
+-                self._chat_tool_choice(request.effective_tool_choice())
++                self._chat_tool_choice(
++                    self._model_tool_choice(request, namespace_aliases)
++                )
+                 if chat_tools
+                 else "none"
+             ),
+@@ -592,13 +677,25 @@
+ 
+         is_multimodal = self.tokenizer_manager.model_config.is_multimodal
+         processed_messages = self._process_messages(chat_request, is_multimodal)
+-
+-        if is_multimodal:
+-            request_prompts = [processed_messages.prompt]
+-            engine_prompts = [processed_messages.prompt]
+-        else:
+-            request_prompts = [processed_messages.prompt_ids]
+-            engine_prompts = [processed_messages.prompt_ids]
++        # ``_process_messages`` merges server defaults into the temporary Chat
++        # request before rendering. Response parsing happens later from the
++        # original request, so carry over the exact template kwargs that selected
++        # the wire-format delimiters.
++        request.chat_template_kwargs = (
++            dict(chat_request.chat_template_kwargs)
++            if chat_request.chat_template_kwargs is not None
++            else None
++        )
++
++        # Pinned kanadaj base has no _engine_prompt helper. Preserve its multimodal
++        # text -> processor path and text-only pre-tokenized path verbatim.
++        engine_prompt = (
++            processed_messages.prompt
++            if is_multimodal
++            else processed_messages.prompt_ids
++        )
++        request_prompts = [engine_prompt]
++        engine_prompts = [engine_prompt]
+ 
+         return messages, request_prompts, engine_prompts, processed_messages
+ 
+@@ -607,9 +704,21 @@
+         request: ResponsesRequest,
+         prev_response: Optional[ResponsesResponse],
+     ):
+-        if request.tool_choice != "auto":
+-            raise NotImplementedError(
+-                "Only 'auto' tool_choice is supported in " "response API"
++        tool_choice = request.effective_tool_choice()
++        if tool_choice != "auto":
++            requirement = (
++                "restrict the recipient to the named tool"
++                if isinstance(tool_choice, dict)
++                else (
++                    "require a tool recipient"
++                    if tool_choice == "required"
++                    else "exclude tool recipients"
++                )
++            )
++            raise ValueError(
++                f"Harmony tool_choice={request.tool_choice!r} cannot {requirement}: "
++                "recipient-header decoding constraints are not implemented; "
++                "use tool_choice='auto'."
+             )
+         messages = self._construct_input_messages_with_harmony(request, prev_response)
+         prompt_token_ids = render_for_completion(messages)
+@@ -628,6 +737,7 @@
+         created_time: Optional[int] = None,
+         *,
+         require_reasoning: bool,
++        output_items: Optional[list] = None,
+     ) -> Union[ResponsesResponse, ORJSONResponse]:
+         if created_time is None:
+             created_time = int(time.time())
+@@ -637,19 +747,41 @@
+                 pass
+         except asyncio.CancelledError:
+             return self.create_error_response("Client disconnected")
++        except HTTPException as e:
++            return self.create_error_response(
++                str(e.detail),
++                err_type=(
++                    "server_error" if e.status_code >= 500 else "invalid_request_error"
++                ),
++                status_code=e.status_code,
++            )
+         except ValueError as e:
+             return self.create_error_response(str(e))
+ 
+         status = "completed"
++        finish_reason = None
+         if self.use_harmony:
+             assert isinstance(context, HarmonyContext)
+-            output = self._make_response_output_items_with_harmony(context)
++            output = (
++                output_items
++                if output_items is not None
++                else self._make_response_output_items_with_harmony(
++                    context,
++                    namespace_tool_names(request.tools),
++                    {
++                        tool.name
++                        for tool in request.tools or []
++                        if tool.type in ("function", "custom") and tool.name
++                    },
++                )
++            )
+             # num_reasoning_tokens isn't wired through HarmonyContext yet; stays 0.
+             num_prompt_tokens = context.num_prompt_tokens
+             num_generated_tokens = context.num_output_tokens
+             num_cached_tokens = context.num_cached_tokens
+             num_reasoning_tokens = context.num_reasoning_tokens
+-            status = self._status_from_finish_reason(context.finish_reason)
++            finish_reason = context.finish_reason
++            status = self._status_from_finish_reason(finish_reason)
+         else:
+             assert isinstance(context, SimpleContext)
+             final_res = context.last_output
+@@ -669,20 +801,25 @@
+                 if request.is_include_output_logprobs() and isinstance(meta_info, dict)
+                 else None
+             )
+-            output = self._make_response_output_items(
+-                request,
+-                final_res["text"],
+-                tokenizer,
+-                output_logprobs=output_logprobs,
+-                require_reasoning=require_reasoning,
+-            )
++            try:
++                output = self._make_response_output_items(
++                    request,
++                    final_res["text"],
++                    tokenizer,
++                    output_logprobs=output_logprobs,
++                    require_reasoning=require_reasoning,
++                    finish_reason=meta_info.get("finish_reason") if meta_info else None,
++                )
++            except Qwen3CoderParseError as e:
++                return self.create_error_response(str(e), "server_error", 500)
+ 
+             if meta_info is not None:
+                 num_prompt_tokens = meta_info.get("prompt_tokens", 0)
+                 num_generated_tokens = meta_info.get("completion_tokens", 0)
+                 num_cached_tokens = meta_info.get("cached_tokens", 0)
+                 num_reasoning_tokens = meta_info.get("reasoning_tokens", 0)
+-                status = self._status_from_finish_reason(meta_info.get("finish_reason"))
++                finish_reason = meta_info.get("finish_reason")
++                status = self._status_from_finish_reason(finish_reason)
+             elif isinstance(final_res, dict) and (
+                 final_res.get("prompt_token_ids") is not None
+                 or final_res.get("output_ids") is not None
+@@ -734,12 +871,26 @@
+             usage=usage,
+         )
+ 
++        response.error = self._error_from_finish_reason(finish_reason)
+         if request.store:
+             async with self.response_store_lock:
+                 stored_response = self.response_store.get(response.id)
+                 # If the response is already cancelled, don't update it
+                 if stored_response is None or stored_response.status != "cancelled":
+                     self.response_store[response.id] = response
++                    if self.use_harmony:
++                        self.msg_store[response.id] = (
++                            self.msg_store.get(response.id, []) + context.messages
++                            if isinstance(context, StreamingHarmonyContext)
++                            else context.messages[2:]
++                        )
++                    else:
++                        self.msg_store[response.id] = self._response_input_history(
++                            request
++                        ) + [
++                            item.model_dump(exclude_none=True)
++                            for item in response.output
++                        ]
+ 
+         return response
+ 
+@@ -747,16 +898,117 @@
+     def _wants_reasoning_summary(request: ResponsesRequest) -> bool:
+         return request.reasoning is not None and request.reasoning.summary is not None
+ 
++    @classmethod
++    def _make_reasoning_item(
++        cls,
++        request: ResponsesRequest,
++        text: str,
++        *,
++        item_id: str,
++        status: Optional[str],
++    ) -> ResponseReasoningItem:
++        """Build a reasoning item, mirroring the trace into ``summary`` when the
++        caller opted in via ``reasoning.summary``; the full trace stays in
++        ``content``."""
++        wants_summary = cls._wants_reasoning_summary(request)
++        return ResponseReasoningItem(
++            id=item_id,
++            type="reasoning",
++            summary=(
++                [ResponseReasoningSummary(type="summary_text", text=text)]
++                if wants_summary
++                else []
++            ),
++            content=[ResponseReasoningTextContent(type="reasoning_text", text=text)],
++            encrypted_content=(
++                encode_reasoning_state(text)
++                if request.is_include_encrypted_reasoning()
++                else None
++            ),
++            status=status,
++        )
++
++    @staticmethod
++    def _make_tool_call_item(
++        name: str,
++        arguments: str,
++        custom_names: set[str],
++        namespaces: set[str] = frozenset(),
++        declared_names: set[str] = frozenset(),
++        namespace_aliases: Optional[NamespaceToolAliases] = None,
++    ) -> Union[
++        ResponseFunctionToolCall,
++        ResponseCustomToolCall,
++        ResponseNamespacedFunctionToolCall,
++    ]:
++        """A call against a ``custom`` tool reports its freeform payload rather
++        than the JSON arguments of the shim function tool; a call against a
++        flattened ``namespace`` member splits the qualified name back into
++        ``name`` plus ``namespace``."""
++        call_id = f"call_{random_uuid()[:24]}"
++        if name in custom_names:
++            return ResponseCustomToolCall(
++                type="custom_tool_call",
++                id=f"ctc_{random_uuid()[:8]}",
++                call_id=call_id,
++                name=name,
++                input=decode_custom_tool_input(arguments),
++            )
++        item_name, namespace = split_namespaced_call(
++            name, namespaces, declared_names, namespace_aliases
++        )
++        if namespace is not None:
++            return ResponseNamespacedFunctionToolCall(
++                arguments=arguments,
++                call_id=call_id,
++                type="function_call",
++                name=item_name,
++                namespace=namespace,
++                id=f"fc_{random_uuid()[:8]}",
++                status="completed",
++            )
++        return ResponseFunctionToolCall(
++            arguments=arguments,
++            call_id=call_id,
++            type="function_call",
++            name=item_name,
++            id=f"fc_{random_uuid()[:8]}",
++            status="completed",
++        )
++
+     @staticmethod
+     def _status_from_finish_reason(finish_reason: Any) -> str:
+-        """Only a length-capped generation is ``incomplete``; anything that got
+-        here otherwise finished normally."""
+         reason = None
+         if isinstance(finish_reason, dict):
+             reason = finish_reason.get("type")
+         elif isinstance(finish_reason, str):
+             reason = finish_reason
+-        return "incomplete" if reason == "length" else "completed"
++        if reason == "length":
++            return "incomplete"
++        if reason in ("abort", "error"):
++            return "failed"
++        return "completed"
++
++    @classmethod
++    def _error_from_finish_reason(cls, finish_reason: Any) -> Optional[dict]:
++        if cls._status_from_finish_reason(finish_reason) != "failed":
++            return None
++        message = (
++            finish_reason.get("message") if isinstance(finish_reason, dict) else None
++        )
++        return {"code": "server_error", "message": message or "Generation aborted"}
++
++    @staticmethod
++    def _terminal_stream_event(response: dict):
++        status = response["status"]
++        event_cls = {
++            "completed": openai_responses_types.ResponseCompletedEvent,
++            "incomplete": openai_responses_types.ResponseIncompleteEvent,
++            "failed": openai_responses_types.ResponseFailedEvent,
++        }[status]
++        return event_cls(
++            type=f"response.{status}", sequence_number=-1, response=response
++        )
+ 
+     def _is_thinking_enabled_for_request(self, request: ResponsesRequest) -> bool:
+         if not self.reasoning_parser:
+@@ -806,8 +1058,10 @@
+         output_logprobs: Optional[list] = None,
+         *,
+         require_reasoning: bool,
++        finish_reason: Optional[dict] = None,
+     ):
+-        chat_tools = self._response_tools_to_chat_tools(request)
++        namespace_aliases = self._qwen_namespace_aliases(request)
++        chat_tools = self._response_tools_for_parser(request, namespace_aliases)
+         if self.reasoning_parser:
+             reasoning_parser = ReasoningParser(
+                 model_type=self.reasoning_parser,
+@@ -832,33 +1086,29 @@
+ 
+         output_items = []
+         if reasoning_content:
+-            # Mirror the single parsed blob into ``summary`` when the caller opts
+-            # in via ``reasoning.summary``; full trace stays in ``content``.
+-            wants_summary = self._wants_reasoning_summary(request)
+-            reasoning_item = ResponseReasoningItem(
+-                id=f"rs_{random_uuid()}",
+-                type="reasoning",
+-                summary=(
+-                    [
+-                        ResponseReasoningSummary(
+-                            type="summary_text", text=reasoning_content
+-                        )
+-                    ]
+-                    if wants_summary
+-                    else []
+-                ),
+-                content=[
+-                    ResponseReasoningTextContent(
+-                        type="reasoning_text", text=reasoning_content
+-                    ),
+-                ],
+-                status=None,
+-            )
+-            output_items.append(reasoning_item)
+-
+-        is_required = request.tool_choice == "required"
+-        tool_call_items: list[ResponseFunctionToolCall] = []
++            output_items.append(
++                self._make_reasoning_item(
++                    request,
++                    reasoning_content,
++                    item_id=f"rs_{random_uuid()}",
++                    status=None,
++                )
++            )
++
++        tool_choice = request.effective_tool_choice()
++        is_required = tool_choice == "required" or isinstance(tool_choice, dict)
++        custom_names = custom_tool_names(request.tools)
++        namespaces = namespace_tool_names(request.tools)
++        declared_names = {
++            tool.name
++            for tool in request.tools or []
++            if tool.type in ("function", "custom") and tool.name
++        }
++        tool_call_items: list[
++            Union[ResponseFunctionToolCall, ResponseCustomToolCall]
++        ] = []
+         parsed_via_native = False
++        detector_owns_format = False
+         if (
+             content
+             and chat_tools
+@@ -870,28 +1120,39 @@
+                 self.tool_call_parser,
+                 tokenizer=self.tokenizer_manager.tokenizer,
+             )
+-            should_try_native = (
+-                not is_required or parser.detector.supports_structural_tag()
+-            )
++            detector_owns_format = self._tool_parser_owns_format(parser)
++            should_try_native = not is_required or detector_owns_format
+             if should_try_native and parser.has_tool_call(content):
+                 try:
+                     content, call_info_list = parser.parse_non_stream(content)
+                     for call_info in call_info_list:
+                         tool_call_items.append(
+-                            ResponseFunctionToolCall(
+-                                arguments=call_info.parameters or "",
+-                                call_id=f"call_{random_uuid()[:24]}",
+-                                type="function_call",
+-                                name=call_info.name,
+-                                id=f"fc_{random_uuid()[:8]}",
+-                                status="completed",
++                            self._make_tool_call_item(
++                                call_info.name,
++                                call_info.parameters or "",
++                                custom_names,
++                                namespaces,
++                                declared_names,
++                                namespace_aliases,
+                             )
+                         )
+                     parsed_via_native = bool(call_info_list)
++                except IncompleteQwen3CoderToolCall as e:
++                    if not finish_reason or finish_reason.get("type") != "length":
++                        raise
++                    content = e.normal_text
++                except Qwen3CoderParseError:
++                    raise
+                 except Exception as e:
+                     logger.error("Tool call parsing error: %s", e)
+ 
+-        if content and chat_tools and is_required and not parsed_via_native:
++        if (
++            content
++            and chat_tools
++            and is_required
++            and not parsed_via_native
++            and not detector_owns_format
++        ):
+             try:
+                 tool_call_data = orjson.loads(content)
+                 if isinstance(tool_call_data, dict):
+@@ -904,13 +1165,13 @@
+                             tool.get("parameters", {}), ensure_ascii=False
+                         )
+                         tool_call_items.append(
+-                            ResponseFunctionToolCall(
+-                                arguments=arguments,
+-                                call_id=f"call_{random_uuid()[:24]}",
+-                                type="function_call",
+-                                name=tool["name"],
+-                                id=f"fc_{random_uuid()[:8]}",
+-                                status="completed",
++                            self._make_tool_call_item(
++                                tool["name"],
++                                arguments,
++                                custom_names,
++                                namespaces,
++                                declared_names,
++                                namespace_aliases,
+                             )
+                         )
+                     content = ""
+@@ -926,6 +1187,7 @@
+                 logprobs=output_logprobs,
+             )
+             message = ResponseOutputMessage(
++                phase="commentary" if tool_call_items else "final_answer",
+                 id=f"msg_{random_uuid()}",
+                 content=[output_text],
+                 role="assistant",
+@@ -939,16 +1201,29 @@
+     def _make_response_output_items_with_harmony(
+         self,
+         context: HarmonyContext,
++        namespaces: Optional[set[str]] = None,
++        declared_names: Optional[set[str]] = None,
+     ):
+         output_items = []
+-        num_init_messages = context.num_init_messages
++        num_init_messages = (
++            0
++            if isinstance(context, StreamingHarmonyContext)
++            else context.num_init_messages
++        )
+         for msg in context.messages[num_init_messages:]:
+-            output_items.extend(parse_output_message(msg))
++            output_items.extend(parse_output_message(msg, namespaces, declared_names))
+         # Handle the generation stopped in the middle (if any).
+-        last_items = parse_remaining_state(context.parser)
++        last_items = parse_remaining_state(context.parser, namespaces, declared_names)
+         if last_items:
+             output_items.extend(last_items)
+         return output_items
++
++    @staticmethod
++    def _tool_parser_owns_format(parser: FunctionCallParser) -> bool:
++        return (
++            parser.detector.supports_structural_tag()
++            or parser.detector.parses_required_natively()
++        )
+ 
+     @staticmethod
+     def _chat_tool_choice(tool_choice: Any) -> Any:
+@@ -958,25 +1233,101 @@
+             return tool_choice
+         return {"type": "function", "function": {"name": tool_choice["name"]}}
+ 
++    def _qwen_namespace_aliases(self, request: ResponsesRequest):
++        model_type = self.tokenizer_manager.model_config.hf_config.model_type
++        if model_type in {"qwen3_8_flash_next", "qwen3_8_flash_next_text", "qwen4_exp"}:
++            return NamespaceToolAliases(request.tools)
++        return None
++
+     @staticmethod
+-    def _response_tools_to_chat_tools(request: ResponsesRequest) -> list[Tool]:
+-        # Only ``function`` tools flow to chat; built-ins go through harmony.
++    def _model_tool_choice(
++        request: ResponsesRequest, aliases: Optional[NamespaceToolAliases]
++    ):
++        choice = request.effective_tool_choice()
++        if aliases is None or not isinstance(choice, dict):
++            return choice
++        raw = request.tool_choice
++        name = raw.get("name") or (raw.get("function") or {}).get("name")
++        namespace = raw.get("namespace")
++        if namespace:
++            alias = aliases.by_identity.get((namespace, name))
++            if alias is None:
++                raise ValueError(
++                    f"Tool {namespace!r}.{name!r} is not declared in tools"
++                )
++            return {**choice, "name": alias}
++        ordinary = {
++            tool.name
++            for tool in request.tools or []
++            if tool.type in ("function", "custom") and tool.name
++        }
++        if choice["name"] not in ordinary:
++            matches = [
++                alias
++                for (namespace, name), alias in aliases.by_identity.items()
++                if f"{namespace}.{name}" == choice["name"]
++            ]
++            if len(matches) > 1:
++                raise ValueError(
++                    "Ambiguous tool choice; specify namespace and name separately"
++                )
++            if matches:
++                return {**choice, "name": matches[0]}
++            if choice["name"] in aliases.by_alias:
++                raise ValueError("Tool choice must use the declared namespace and name")
++        return choice
++
++    @staticmethod
++    def _response_tools_to_chat_tools(
++        request: ResponsesRequest,
++        namespace_aliases: Optional[NamespaceToolAliases] = None,
++    ) -> list[Tool]:
++        # ``function`` and ``custom`` tools flow to chat; built-ins go through
++        # harmony. A custom tool is shimmed into a single-string function tool;
++        # a namespace tool's members flatten to ``{namespace}.{name}``
++        # functions.
+         chat_tools = []
+-        for tool in request.tools:
+-            if tool.type != "function":
++        for tool in request.tools or []:
++            if tool.type == "function":
++                description, parameters = tool.description, tool.parameters
++            elif tool.type == "custom" and tool.name:
++                description = custom_tool_description(tool.description, tool.format)
++                parameters = custom_tool_parameters()
++            elif tool.type == "namespace" and tool.name:
++                chat_tools.extend(
++                    namespace_members_to_chat_tools(tool, namespace_aliases)
++                )
++                continue
++            else:
+                 continue
+             chat_tools.append(
+                 Tool(
+                     type="function",
+                     function=Function(
+                         name=tool.name,
+-                        description=tool.description,
+-                        parameters=tool.parameters,
++                        description=description,
++                        parameters=parameters,
+                         strict=tool.strict,
+                     ),
+                 )
+             )
+         return chat_tools
++
++    @classmethod
++    def _response_tools_for_parser(
++        cls,
++        request: ResponsesRequest,
++        namespace_aliases: Optional[NamespaceToolAliases],
++    ) -> list[Tool]:
++        tools = cls._response_tools_to_chat_tools(request, namespace_aliases)
++        if namespace_aliases is not None:
++            # Historical dotted calls still need their schemas for typed arguments.
++            names = {tool.function.name for tool in tools}
++            for legacy in cls._response_tools_to_chat_tools(request):
++                if legacy.function.name not in names:
++                    tools.append(legacy)
++                    names.add(legacy.function.name)
++        return tools
+ 
+     @staticmethod
+     def _normalize_response_content_part_for_chat(content_part: Any) -> Any:
+@@ -1022,18 +1373,50 @@
+ 
+         return content_part
+ 
++    @staticmethod
++    def _flatten_tool_output(output: Any) -> str:
++        """``output`` may be a string or an array of content parts (OpenAI allows
++        both); the chat tool message needs a string."""
++        if isinstance(output, list):
++            return "".join(p.get("text", "") for p in output if isinstance(p, dict))
++        return output
++
++    @staticmethod
++    def _chat_tool_call_message(message: dict, name: Any, arguments: str) -> dict:
++        return {
++            "role": "assistant",
++            "tool_calls": [
++                {
++                    "id": message.get("call_id") or message.get("id"),
++                    "type": "function",
++                    "function": {"name": name, "arguments": arguments},
++                }
++            ],
++        }
++
+     @classmethod
+-    def _normalize_response_message_for_chat(cls, message: Any) -> Any:
++    def _normalize_response_message_for_chat(
++        cls,
++        message: Any,
++        namespace_aliases: Optional[NamespaceToolAliases] = None,
++        *,
++        preserve_tool_media: bool = False,
++    ) -> Any:
+         """Convert one Responses-API input item to a chat-completions message."""
+         if hasattr(message, "model_dump"):
+             message = message.model_dump(exclude_none=True)
+         if not isinstance(message, dict):
+             return message
+ 
+-        # Most chat templates only recognize system/user/assistant/tool;
+-        # collapse ``developer`` to ``system`` at the boundary.
++        # Most chat templates only recognize system/user/assistant/tool; collapse
++        # ``developer`` to ``system`` at the boundary, labelled so the instruction
++        # tier survives the collapse.
+         if message.get("role") == "developer":
+-            message = {**message, "role": "system"}
++            message = {
++                **message,
++                "role": "system",
++                "content": label_developer_content(message.get("content")),
++            }
+ 
+         msg_type = message.get("type")
+         if msg_type == "function_call":
+@@ -1052,29 +1435,46 @@
+                 raw = orjson.dumps(raw).decode("utf-8")
+             else:
+                 raw = "{}"
+-            return {
+-                "role": "assistant",
+-                "tool_calls": [
+-                    {
+-                        "id": message.get("call_id") or message.get("id"),
+-                        "type": "function",
+-                        "function": {
+-                            "name": message.get("name"),
+-                            "arguments": raw,
+-                        },
+-                    }
+-                ],
+-            }
+-        if msg_type == "function_call_output":
+-            # ``output`` may be a string or an array of content parts (OpenAI
+-            # allows both); the chat tool message needs a string, so flatten.
+-            out = message.get("output", "")
+-            if isinstance(out, list):
+-                out = "".join(p.get("text", "") for p in out if isinstance(p, dict))
++            name = message.get("name")
++            namespace = message.get("namespace")
++            if namespace and name:
++                # Re-qualify so the template sees the flattened name the
++                # model was shown at declaration time.
++                name = (
++                    namespace_aliases.encode(namespace, name)
++                    if namespace_aliases is not None
++                    else f"{namespace}.{name}"
++                )
++            return cls._chat_tool_call_message(message, name, raw)
++        if msg_type == "custom_tool_call":
++            # Replay through the same single-string shim the tool was offered as.
++            return cls._chat_tool_call_message(
++                message,
++                message.get("name"),
++                encode_custom_tool_input(message.get("input") or ""),
++            )
++        if msg_type in ("function_call_output", "custom_tool_call_output"):
++            output = message.get("output", "")
++            if preserve_tool_media and isinstance(output, list):
++                parts = [
++                    cls._normalize_response_content_part_for_chat(part)
++                    for part in output
++                ]
++                # Keep media in the tool turn so Chat's processor loads the images.
++                content = (
++                    "".join(part.get("text", "") for part in parts)
++                    if all(
++                        isinstance(part, dict) and part.get("type") == "text"
++                        for part in parts
++                    )
++                    else parts
++                )
++            else:
++                content = cls._flatten_tool_output(output)
+             return {
+                 "role": "tool",
+                 "tool_call_id": message.get("call_id"),
+-                "content": out,
++                "content": content,
+             }
+         # Reasoning items render as {role: assistant, reasoning_content};
+         # empty ones drop instead of injecting an empty assistant block.
+@@ -1094,6 +1494,11 @@
+             if not text_parts:
+                 text_parts = _collect(message.get("content"))
+             if not text_parts:
++                # A store=false client may replay only the opaque blob.
++                restored = decode_reasoning_state(message.get("encrypted_content"))
++                if restored:
++                    text_parts = [restored]
++            if not text_parts:
+                 return None
+             return {
+                 "role": "assistant",
+@@ -1123,39 +1528,41 @@
+         }
+ 
+     @staticmethod
+-    def _output_message_text(output_item: Any) -> Optional[str]:
+-        """Return assistant text from a ``message`` output item (joining
+-        ``output_text`` parts with newlines), or None for non-message items."""
+-        if isinstance(output_item, ResponseReasoningItem):
+-            return None
+-        if hasattr(output_item, "model_dump"):
+-            output_item = output_item.model_dump(exclude_none=True)
+-        if not isinstance(output_item, dict):
+-            return None
+-        if output_item.get("type") != "message":
+-            return None
+-
+-        text_parts = []
+-        for content in output_item.get("content") or []:
+-            if isinstance(content, ResponseOutputText):
+-                text_parts.append(content.text)
+-                continue
+-            if hasattr(content, "model_dump"):
+-                content = content.model_dump(exclude_none=True)
+-            if isinstance(content, dict) and content.get("type") == "output_text":
+-                text = content.get("text")
+-                if text is not None:
+-                    text_parts.append(text)
+-
+-        return "\n".join(text_parts) if text_parts else None
+-
+-    @staticmethod
+     def _merge_consecutive_assistant_messages(
+         messages: list,
++        *,
++        preserve_qwen_order: bool = False,
+     ) -> list:
+         """Collapse runs of consecutive ``assistant`` dicts into one entry,
+         joining ``content`` and concatenating ``tool_calls`` and
+         ``reasoning_content`` so a logical turn renders as a single block."""
++
++        def compatible(left: dict, right: dict) -> bool:
++            left_phase, right_phase = left.get("phase"), right.get("phase")
++            if not preserve_qwen_order:
++                return left_phase == right_phase
++            if (
++                left_phase is not None
++                and right_phase is not None
++                and left_phase != right_phase
++            ):
++                return False
++            if left_phase == "final_answer" and (
++                right.get("reasoning_content") or right.get("tool_calls")
++            ):
++                return False
++
++            # Qwen renders reasoning, then content, then calls within each block.
++            # Merging a restarted sequence would move later items ahead of earlier ones.
++            fields = ("reasoning_content", "content", "tool_calls")
++            left_stages = [i for i, field in enumerate(fields) if left.get(field)]
++            right_stages = [i for i, field in enumerate(fields) if right.get(field)]
++            return (
++                not left_stages
++                or not right_stages
++                or (max(left_stages) <= min(right_stages))
++            )
++
+         merged: list = []
+         for msg in messages:
+             if (
+@@ -1164,8 +1571,16 @@
+                 and merged
+                 and isinstance(merged[-1], dict)
+                 and merged[-1].get("role") == "assistant"
++                and compatible(merged[-1], msg)
+             ):
+                 prev = merged[-1] = dict(merged[-1])
++                # Reasoning and calls have no phase; keep their associated text's phase.
++                if (
++                    preserve_qwen_order
++                    and prev.get("phase") is None
++                    and msg.get("phase") is not None
++                ):
++                    prev["phase"] = msg["phase"]
+                 # Lift mixed str/list content to list parts so non-text parts
+                 # (e.g. image_url) survive when the two sides differ in shape.
+                 new_content = msg.get("content")
+@@ -1204,6 +1619,18 @@
+             merged.append(msg)
+         return merged
+ 
++    def _response_input_history(self, request: ResponsesRequest) -> list:
++        history = (
++            list(self.msg_store[request.previous_response_id])
++            if request.previous_response_id is not None
++            else []
++        )
++        if isinstance(request.input, str):
++            history.append({"role": "user", "content": request.input})
++        else:
++            history.extend(request.input)
++        return history
++
+     def _construct_input_messages(
+         self,
+         request: ResponsesRequest,
+@@ -1218,32 +1645,26 @@
+                 }
+             )
+ 
+-        # Prepend the conversation history
+-        if prev_response is not None:
+-            # Add the previous messages
+-            prev_msg = self.msg_store[prev_response.id]
+-            messages.extend(prev_msg)
+-
+-            for output_item in prev_response.output:
+-                assistant_text = self._output_message_text(output_item)
+-                if assistant_text is None:
+-                    continue
+-                messages.append({"role": "assistant", "content": assistant_text})
+-
+-        # Append the new input
+-        # Responses API supports simple text inputs without chat format
+-        if isinstance(request.input, str):
+-            messages.append({"role": "user", "content": request.input})
+-        else:
+-            for input_item in request.input:
+-                normalized = self._normalize_response_message_for_chat(input_item)
+-                if normalized is not None:
+-                    messages.append(normalized)  # type: ignore
++        namespace_aliases = self._qwen_namespace_aliases(request)
++        is_qwen = self.tokenizer_manager.model_config.hf_config.model_type in {
++            "qwen3_8_flash_next",
++            "qwen3_8_flash_next_text",
++            "qwen4_exp",
++        }
++        for input_item in self._response_input_history(request):
++            normalized = self._normalize_response_message_for_chat(
++                input_item, namespace_aliases, preserve_tool_media=is_qwen
++            )
++            if normalized is not None:
++                messages.append(normalized)
+ 
+         # One Responses-API assistant turn maps to multiple input items
+         # (message + function_call(s)); collapse them into one chat message
+         # so chat templates render a single assistant block per turn.
+-        messages = self._merge_consecutive_assistant_messages(messages)
++        messages = self._merge_consecutive_assistant_messages(
++            messages,
++            preserve_qwen_order=is_qwen,
++        )
+ 
+         # Most chat templates expect a single leading ``system`` message;
+         # coalesce any ``instructions`` + interleaved ``developer`` entries.
+@@ -1274,61 +1695,33 @@
+         prev_response: Optional[ResponsesResponse],
+     ) -> list[OpenAIMessage]:
+         messages: list[OpenAIMessage] = []
+-        if prev_response is None:
+-            # New conversation.
+-            reasoning_effort = request.reasoning.effort if request.reasoning else None
+-            tool_types = [tool.type for tool in request.tools]
+-            enable_browser = (
+-                any(t in tool_types for t in ("web_search", "web_search_preview"))
+-                and self.tool_server is not None
+-            )
+-            enable_code_interpreter = (
+-                "code_interpreter" in tool_types and self.tool_server is not None
+-            )
+-            sys_msg = get_system_message(
+-                reasoning_effort=reasoning_effort,
+-                browser_description=(
+-                    self.tool_server.get_tool_description("browser")
+-                    if self.tool_server and enable_browser
+-                    else None
+-                ),
+-                python_description=(
+-                    self.tool_server.get_tool_description("python")
+-                    if self.tool_server and enable_code_interpreter
+-                    else None
+-                ),
+-            )
+-            messages.append(sys_msg)
+-            dev_msg = get_developer_message(request.instructions, request.tools)
+-            messages.append(dev_msg)
+-        else:
+-            # Continue the previous conversation.
+-            # FIXME: Currently, request params like reasoning and
+-            # instructions are ignored.
+-            prev_msgs = self.msg_store[prev_response.id]
+-            # Remove the previous chain-of-thoughts if there is a new "final"
+-            # message.
+-            if (
+-                len(prev_msgs) > 0
+-                and hasattr(prev_msgs[-1], "channel")
+-                and prev_msgs[-1].channel == "final"
+-            ):  # type: ignore[union-attr]
+-                prev_final_msg_idx = -1
+-                for i in range(len(prev_msgs) - 2, -1, -1):
+-                    if (
+-                        hasattr(prev_msgs[i], "channel")
+-                        and prev_msgs[i].channel == "final"
+-                    ):  # type: ignore[union-attr]
+-                        prev_final_msg_idx = i
+-                        break
+-                recent_turn_msgs = prev_msgs[prev_final_msg_idx + 1 :]
+-                del prev_msgs[prev_final_msg_idx + 1 :]
+-                for msg in recent_turn_msgs:
+-                    if (
+-                        hasattr(msg, "channel") and msg.channel != "analysis"
+-                    ):  # type: ignore[union-attr]
+-                        prev_msgs.append(msg)
+-            messages.extend(prev_msgs)
++        reasoning_effort = request.reasoning.effort if request.reasoning else None
++        tool_types = [tool.type for tool in request.tools]
++        enable_browser = (
++            any(t in tool_types for t in ("web_search", "web_search_preview"))
++            and self.tool_server is not None
++        )
++        enable_code_interpreter = (
++            "code_interpreter" in tool_types and self.tool_server is not None
++        )
++        sys_msg = get_system_message(
++            reasoning_effort=reasoning_effort,
++            browser_description=(
++                self.tool_server.get_tool_description("browser")
++                if self.tool_server and enable_browser
++                else None
++            ),
++            python_description=(
++                self.tool_server.get_tool_description("python")
++                if self.tool_server and enable_code_interpreter
++                else None
++            ),
++        )
++        messages.append(sys_msg)
++        dev_msg = get_developer_message(request.instructions, request.tools)
++        messages.append(dev_msg)
++        if prev_response is not None:
++            messages.extend(self.msg_store[prev_response.id])
+         # Append the new input.
+         # Responses API supports simple text inputs without chat format.
+         if isinstance(request.input, str):
+@@ -1340,7 +1733,12 @@
+                 prev_outputs = []
+             for response_msg in request.input:
+                 messages.append(parse_response_input(response_msg, prev_outputs))
+-                if isinstance(response_msg, ResponseFunctionToolCall):
++                item_type = (
++                    response_msg.get("type")
++                    if isinstance(response_msg, dict)
++                    else response_msg.type
++                )
++                if item_type in ("function_call", "custom_tool_call"):
+                     prev_outputs.append(response_msg)
+         return messages
+ 
+@@ -1464,30 +1862,176 @@
+         *,
+         require_reasoning: bool,
+     ) -> AsyncGenerator[str, None]:
+-        # TODO:
+-        # 1. Handle disconnect
+-
+         created_time = created_time or int(time.time())
+-
+         sequence_number = 0
+-
+-        def _send_event(event):
++        namespaces = namespace_tool_names(request.tools)
++        declared_names = {
++            tool.name
++            for tool in request.tools or []
++            if tool.type in ("function", "custom") and tool.name
++        }
++        emitted_items = []
++        active_item = None
++        active_model = None
++        num_messages = 0
++
++        def _send_event(event_type: str, **fields):
+             nonlocal sequence_number
+-            # Set sequence_number if the event has this attribute
+-            if hasattr(event, "sequence_number"):
+-                event.sequence_number = sequence_number
++            payload = {"type": event_type, "sequence_number": sequence_number, **fields}
+             sequence_number += 1
+-            # Get event type from the event's type field if it exists
+-            event_type = getattr(event, "type", "unknown")
+-            return (
+-                f"event: {event_type}\n"
+-                f"data: {event.model_dump_json(indent=None)}\n\n"
+-            )
+-
+-        current_content_index = 0
+-        current_output_index = 0
+-        current_item_id = f"item_{random_uuid()}"
+-        sent_output_item_added = False
++            return f"event: {event_type}\ndata: {orjson.dumps(payload).decode()}\n\n"
++
++        def _update_item(item, *, done=False, status="completed"):
++            nonlocal active_item, active_model
++            if item.type == "reasoning":
++                item = self._make_reasoning_item(
++                    request,
++                    "\n".join(part.text for part in item.content or []),
++                    item_id=item.id,
++                    status=item.status,
++                )
++            snapshot = item.model_dump()
++            output_index = len(emitted_items)
++            if active_item is None:
++                active_item = dict(snapshot)
++                if "status" in active_item:
++                    active_item["status"] = "in_progress"
++                for field in ("content", "summary"):
++                    if field in active_item:
++                        active_item[field] = []
++                for field in ("arguments", "code"):
++                    if field in active_item:
++                        active_item[field] = ""
++                if "encrypted_content" in active_item:
++                    active_item["encrypted_content"] = None
++                yield _send_event(
++                    "response.output_item.added",
++                    output_index=output_index,
++                    item=active_item,
++                )
++                if item.type in ("web_search_call", "code_interpreter_call"):
++                    yield _send_event(
++                        f"response.{item.type}.in_progress",
++                        output_index=output_index,
++                        item_id=active_item["id"],
++                    )
++            elif active_item["type"] != snapshot["type"]:
++                raise ValueError(
++                    f"Harmony changed item type before closing the previous item, rid={request.request_id}"
++                )
++
++            snapshot["id"] = active_item["id"]
++            if "call_id" in active_item:
++                snapshot["call_id"] = active_item["call_id"]
++            active_model = type(item).model_validate(snapshot)
++            common = {"output_index": output_index, "item_id": active_item["id"]}
++
++            for field in ("content", "summary"):
++                parts = snapshot.get(field) or []
++                if not parts:
++                    continue
++                is_summary = field == "summary"
++                event_prefix = (
++                    "response.reasoning_summary_text"
++                    if is_summary
++                    else (
++                        "response.output_text"
++                        if item.type == "message"
++                        else "response.reasoning_text"
++                    )
++                )
++                index_key = "summary_index" if is_summary else "content_index"
++                part_prefix = (
++                    "response.reasoning_summary_part"
++                    if is_summary
++                    else "response.content_part" if item.type == "message" else None
++                )
++                for index, part in enumerate(parts):
++                    part_fields = {**common, index_key: index}
++                    if index == len(active_item[field]):
++                        empty_part = {**part, "text": ""}
++                        active_item[field].append(empty_part)
++                        if part_prefix:
++                            yield _send_event(
++                                f"{part_prefix}.added", **part_fields, part=empty_part
++                            )
++                    previous_text = active_item[field][index]["text"]
++                    if not part["text"].startswith(previous_text):
++                        raise ValueError(
++                            f"Harmony rewrote previously emitted text, rid={request.request_id}"
++                        )
++                    delta = part["text"][len(previous_text) :]
++                    if delta:
++                        extra = (
++                            {"logprobs": []}
++                            if item.type == "message" and not is_summary
++                            else {}
++                        )
++                        yield _send_event(
++                            f"{event_prefix}.delta", **part_fields, delta=delta, **extra
++                        )
++                    active_item[field][index] = part
++                    if done:
++                        extra = (
++                            {"logprobs": []}
++                            if item.type == "message" and not is_summary
++                            else {}
++                        )
++                        yield _send_event(
++                            f"{event_prefix}.done",
++                            **part_fields,
++                            text=part["text"],
++                            **extra,
++                        )
++                        if part_prefix:
++                            yield _send_event(
++                                f"{part_prefix}.done", **part_fields, part=part
++                            )
++
++            for field, event_prefix in (
++                ("arguments", "response.function_call_arguments"),
++                ("code", "response.code_interpreter_call_code"),
++            ):
++                if field not in snapshot:
++                    continue
++                value = snapshot[field] or ""
++                previous_value = active_item[field] or ""
++                if not value.startswith(previous_value):
++                    raise ValueError(
++                        f"Harmony rewrote previously emitted tool input, rid={request.request_id}"
++                    )
++                delta = value[len(previous_value) :]
++                if delta:
++                    yield _send_event(f"{event_prefix}.delta", **common, delta=delta)
++                active_item[field] = value
++                if done:
++                    yield _send_event(
++                        f"{event_prefix}.done", **common, **{field: value}
++                    )
++
++            if done:
++                if "status" in snapshot:
++                    snapshot["status"] = status
++                if status == "completed" and item.type in (
++                    "web_search_call",
++                    "code_interpreter_call",
++                ):
++                    action = (
++                        "searching"
++                        if item.type == "web_search_call"
++                        else "interpreting"
++                    )
++                    yield _send_event(f"response.{item.type}.{action}", **common)
++                    yield _send_event(f"response.{item.type}.completed", **common)
++                completed_item = type(item).model_validate(snapshot)
++                yield _send_event(
++                    "response.output_item.done",
++                    output_index=output_index,
++                    item=completed_item.model_dump(),
++                )
++                emitted_items.append(completed_item)
++                active_item = None
++                active_model = None
+ 
+         initial_response = ResponsesResponse.from_request(
+             request,
+@@ -1498,362 +2042,28 @@
+             status="in_progress",
+             usage=None,
+         ).model_dump()
+-        yield _send_event(
+-            openai_responses_types.ResponseCreatedEvent(
+-                type="response.created",
+-                sequence_number=-1,
+-                response=initial_response,
+-            )
+-        )
+-        yield _send_event(
+-            openai_responses_types.ResponseInProgressEvent(
+-                type="response.in_progress",
+-                sequence_number=-1,
+-                response=initial_response,
+-            )
+-        )
++        initial_response["tools"] = []
++        yield _send_event("response.created", response=initial_response)
++        yield _send_event("response.in_progress", response=initial_response)
+ 
+         async for ctx in result_generator:
+-            # Only process context objects that implement the `is_expecting_start()` method,
+-            # which indicates they support per-turn streaming (e.g., StreamingHarmonyContext).
+-            # Contexts without this method are skipped, as they do not represent a new turn
+-            # or are not compatible with per-turn handling in the /v1/responses endpoint.
+-            if not hasattr(ctx, "is_expecting_start"):
+-                continue
+-
+-            if ctx.is_expecting_start():
+-                current_output_index += 1
+-                sent_output_item_added = False
+-
+-                if len(ctx.parser.messages) > 0:
+-                    previous_item = ctx.parser.messages[-1]
+-                    if previous_item.recipient is not None:
+-                        # Deal with tool call here
+-                        pass
+-                    elif previous_item.channel == "analysis":
+-                        reasoning_item = ResponseReasoningItem(
+-                            id=f"rs_{random_uuid()}",
+-                            type="reasoning",
+-                            summary=[],
+-                            content=[
+-                                ResponseReasoningTextContent(
+-                                    text=previous_item.content[0].text,
+-                                    type="reasoning_text",
+-                                ),
+-                            ],
+-                            status="completed",
+-                        )
+-                        yield _send_event(
+-                            openai_responses_types.ResponseReasoningTextDoneEvent(
+-                                type="response.reasoning_text.done",
+-                                item_id=current_item_id,
+-                                sequence_number=-1,
+-                                output_index=current_output_index,
+-                                content_index=current_content_index,
+-                                text=previous_item.content[0].text,
+-                            )
+-                        )
+-                        yield _send_event(
+-                            openai_responses_types.ResponseOutputItemDoneEvent(
+-                                type="response.output_item.done",
+-                                sequence_number=-1,
+-                                output_index=current_output_index,
+-                                item=reasoning_item,
+-                            )
+-                        )
+-                    elif previous_item.channel == "final":
+-                        text_content = openai_responses_types.ResponseOutputText(
+-                            type="output_text",
+-                            text=previous_item.content[0].text,
+-                            annotations=[],
+-                        )
+-                        yield _send_event(
+-                            openai_responses_types.ResponseTextDoneEvent(
+-                                type="response.output_text.done",
+-                                sequence_number=-1,
+-                                output_index=current_output_index,
+-                                content_index=current_content_index,
+-                                text=previous_item.content[0].text,
+-                                logprobs=[],
+-                                item_id=current_item_id,
+-                            )
+-                        )
+-                        yield _send_event(
+-                            openai_responses_types.ResponseContentPartDoneEvent(
+-                                type="response.content_part.done",
+-                                sequence_number=-1,
+-                                item_id=current_item_id,
+-                                output_index=current_output_index,
+-                                content_index=current_content_index,
+-                                part=text_content,
+-                            )
+-                        )
+-                        yield _send_event(
+-                            openai_responses_types.ResponseOutputItemDoneEvent(
+-                                type="response.output_item.done",
+-                                sequence_number=-1,
+-                                output_index=current_output_index,
+-                                item=openai_responses_types.ResponseOutputMessage(
+-                                    id=current_item_id,
+-                                    type="message",
+-                                    role="assistant",
+-                                    content=[text_content],
+-                                    status="completed",
+-                                ),
+-                            )
+-                        )
+-
+-            if ctx.parser.last_content_delta:
+-                if (
+-                    ctx.parser.current_channel == "final"
+-                    and ctx.parser.current_recipient is None
+-                ):
+-                    if not sent_output_item_added:
+-                        sent_output_item_added = True
+-                        yield _send_event(
+-                            openai_responses_types.ResponseOutputItemAddedEvent(
+-                                type="response.output_item.added",
+-                                sequence_number=-1,
+-                                output_index=current_output_index,
+-                                item=openai_responses_types.ResponseOutputMessage(
+-                                    id=current_item_id,
+-                                    type="message",
+-                                    role="assistant",
+-                                    content=[],
+-                                    status="in_progress",
+-                                ),
+-                            )
+-                        )
+-                        yield _send_event(
+-                            openai_responses_types.ResponseContentPartAddedEvent(
+-                                type="response.content_part.added",
+-                                sequence_number=-1,
+-                                output_index=current_output_index,
+-                                item_id=current_item_id,
+-                                content_index=current_content_index,
+-                                part=openai_responses_types.ResponseOutputText(
+-                                    type="output_text",
+-                                    text="",
+-                                    annotations=[],
+-                                    logprobs=None,
+-                                ),
+-                            )
+-                        )
+-                    yield _send_event(
+-                        openai_responses_types.ResponseTextDeltaEvent(
+-                            type="response.output_text.delta",
+-                            sequence_number=-1,
+-                            content_index=current_content_index,
+-                            output_index=current_output_index,
+-                            item_id=current_item_id,
+-                            delta=ctx.parser.last_content_delta,
+-                            # TODO, use logprobs from ctx.last_request_output
+-                            logprobs=[],
+-                        )
+-                    )
+-                elif (
+-                    ctx.parser.current_channel == "analysis"
+-                    and ctx.parser.current_recipient is None
+-                ):
+-                    if not sent_output_item_added:
+-                        sent_output_item_added = True
+-                        yield _send_event(
+-                            openai_responses_types.ResponseOutputItemAddedEvent(
+-                                type="response.output_item.added",
+-                                sequence_number=-1,
+-                                output_index=current_output_index,
+-                                item=openai_responses_types.ResponseReasoningItem(
+-                                    type="reasoning",
+-                                    id=current_item_id,
+-                                    summary=[],
+-                                    status="in_progress",
+-                                ),
+-                            )
+-                        )
+-                        yield _send_event(
+-                            openai_responses_types.ResponseContentPartAddedEvent(
+-                                type="response.content_part.added",
+-                                sequence_number=-1,
+-                                output_index=current_output_index,
+-                                item_id=current_item_id,
+-                                content_index=current_content_index,
+-                                # TODO: migrate this to
+-                                # ResponseReasoningTextContent for now
+-                                part=openai_responses_types.ResponseOutputText(
+-                                    type="output_text",
+-                                    text="",
+-                                    annotations=[],
+-                                    logprobs=None,
+-                                ),
+-                            )
+-                        )
+-                    # TODO: migrate to OpenAI types once updated.
+-                    yield _send_event(
+-                        openai_responses_types.ResponseReasoningTextDeltaEvent(
+-                            type="response.reasoning_text.delta",
+-                            item_id=current_item_id,
+-                            output_index=current_output_index,
+-                            content_index=current_content_index,
+-                            delta=ctx.parser.last_content_delta,
+-                            sequence_number=-1,
+-                        )
+-                    )
+-
+-            if ctx.is_assistant_action_turn() and len(ctx.parser.messages) > 0:
+-                previous_item = ctx.parser.messages[-1]
+-                if (
+-                    self.supports_browsing
+-                    and previous_item.recipient is not None
+-                    and previous_item.recipient.startswith("browser.")
+-                ):
+-                    function_name = previous_item.recipient[len("browser.") :]
+-                    action = None
+-                    parsed_args = orjson.loads(previous_item.content[0].text)
+-                    if function_name == "search":
+-                        action = openai_responses_types.response_function_web_search.ActionSearch(
+-                            type="search",
+-                            query=parsed_args["query"],
+-                        )
+-                    elif function_name == "open":
+-                        action = openai_responses_types.response_function_web_search.ActionOpenPage(
+-                            type="open_page",
+-                            # TODO: translate to url
+-                            url=f"cursor:{parsed_args.get('cursor', '')}",
+-                        )
+-                    elif function_name == "find":
+-                        action = openai_responses_types.response_function_web_search.ActionFind(
+-                            type="find",
+-                            pattern=parsed_args["pattern"],
+-                            # TODO: translate to url
+-                            url=f"cursor:{parsed_args.get('cursor', '')}",
+-                        )
+-                    else:
+-                        raise ValueError(f"Unknown function name: {function_name}")
+-
+-                    yield _send_event(
+-                        openai_responses_types.ResponseOutputItemAddedEvent(
+-                            type="response.output_item.added",
+-                            sequence_number=-1,
+-                            output_index=current_output_index,
+-                            item=openai_responses_types.response_function_web_search.ResponseFunctionWebSearch(
+-                                # TODO: generate a unique id for web search call
+-                                type="web_search_call",
+-                                id=current_item_id,
+-                                action=action,
+-                                status="in_progress",
+-                            ),
+-                        )
+-                    )
+-                    yield _send_event(
+-                        openai_responses_types.ResponseWebSearchCallInProgressEvent(
+-                            type="response.web_search_call.in_progress",
+-                            sequence_number=-1,
+-                            output_index=current_output_index,
+-                            item_id=current_item_id,
+-                        )
+-                    )
+-                    yield _send_event(
+-                        openai_responses_types.ResponseWebSearchCallSearchingEvent(
+-                            type="response.web_search_call.searching",
+-                            sequence_number=-1,
+-                            output_index=current_output_index,
+-                            item_id=current_item_id,
+-                        )
+-                    )
+-
+-                    # enqueue
+-                    yield _send_event(
+-                        openai_responses_types.ResponseWebSearchCallCompletedEvent(
+-                            type="response.web_search_call.completed",
+-                            sequence_number=-1,
+-                            output_index=current_output_index,
+-                            item_id=current_item_id,
+-                        )
+-                    )
+-                    yield _send_event(
+-                        openai_responses_types.ResponseOutputItemDoneEvent(
+-                            type="response.output_item.done",
+-                            sequence_number=-1,
+-                            output_index=current_output_index,
+-                            item=openai_responses_types.ResponseFunctionWebSearch(
+-                                type="web_search_call",
+-                                id=current_item_id,
+-                                action=action,
+-                                status="completed",
+-                            ),
+-                        )
+-                    )
+-
+-                if (
+-                    self.supports_code_interpreter
+-                    and previous_item.recipient is not None
+-                    and previous_item.recipient.startswith("python")
+-                ):
+-                    yield _send_event(
+-                        openai_responses_types.ResponseOutputItemAddedEvent(
+-                            type="response.output_item.added",
+-                            sequence_number=-1,
+-                            output_index=current_output_index,
+-                            item=openai_responses_types.ResponseCodeInterpreterToolCallParam(
+-                                type="code_interpreter_call",
+-                                id=current_item_id,
+-                                code="",
+-                                container_id="auto",
+-                                outputs=[],
+-                                status="in_progress",
+-                            ),
+-                        )
+-                    )
+-                    yield _send_event(
+-                        openai_responses_types.ResponseCodeInterpreterCallInProgressEvent(
+-                            type="response.code_interpreter_call.in_progress",
+-                            sequence_number=-1,
+-                            output_index=current_output_index,
+-                            item_id=current_item_id,
+-                        )
+-                    )
+-                    # TODO: do we need to add delta event here?
+-                    yield _send_event(
+-                        openai_responses_types.ResponseCodeInterpreterCallCodeDoneEvent(
+-                            type="response.code_interpreter_call_code.done",
+-                            sequence_number=-1,
+-                            output_index=current_output_index,
+-                            item_id=current_item_id,
+-                            code=previous_item.content[0].text,
+-                        )
+-                    )
+-                    yield _send_event(
+-                        openai_responses_types.ResponseCodeInterpreterCallInterpretingEvent(
+-                            type="response.code_interpreter_call.interpreting",
+-                            sequence_number=-1,
+-                            output_index=current_output_index,
+-                            item_id=current_item_id,
+-                        )
+-                    )
+-                    yield _send_event(
+-                        openai_responses_types.ResponseCodeInterpreterCallCompletedEvent(
+-                            type="response.code_interpreter_call.completed",
+-                            sequence_number=-1,
+-                            output_index=current_output_index,
+-                            item_id=current_item_id,
+-                        )
+-                    )
+-                    yield _send_event(
+-                        openai_responses_types.ResponseOutputItemDoneEvent(
+-                            type="response.output_item.done",
+-                            sequence_number=-1,
+-                            output_index=current_output_index,
+-                            item=openai_responses_types.ResponseCodeInterpreterToolCallParam(
+-                                type="code_interpreter_call",
+-                                id=current_item_id,
+-                                code=previous_item.content[0].text,
+-                                container_id="auto",
+-                                # TODO: add outputs here
+-                                outputs=[],
+-                                status="completed",
+-                            ),
+-                        )
+-                    )
++            for message in ctx.messages[num_messages:]:
++                for item in parse_output_message(message, namespaces, declared_names):
++                    for event in _update_item(item, done=True):
++                        yield event
++            num_messages = len(ctx.messages)
++            for item in parse_remaining_state(ctx.parser, namespaces, declared_names):
++                for event in _update_item(item):
++                    yield event
++
++        if active_model is not None:
++            status = (
++                "incomplete"
++                if self._status_from_finish_reason(context.finish_reason) != "completed"
++                else "completed"
++            )
++            for event in _update_item(active_model, done=True, status=status):
++                yield event
+ 
+         async def empty_async_generator():
+             for _ in ():
+@@ -1869,18 +2079,11 @@
+             request_metadata,
+             created_time=created_time,
+             require_reasoning=require_reasoning,
++            output_items=emitted_items,
+         )
+         response_dict = final_response.model_dump()
+-        # OpenAI SDK's Tool union may not know extended types; drop echo.
+         response_dict["tools"] = []
+-
+-        yield _send_event(
+-            openai_responses_types.ResponseCompletedEvent(
+-                type="response.completed",
+-                sequence_number=-1,
+-                response=response_dict,
+-            )
+-        )
++        yield _send_event(f"response.{final_response.status}", response=response_dict)
+ 
+     async def responses_stream_generator_non_harmony(
+         self,
+@@ -1909,10 +2112,10 @@
+                 event.sequence_number = sequence_number
+             sequence_number += 1
+             event_type = getattr(event, "type", "unknown")
+-            return (
+-                f"event: {event_type}\n"
+-                f"data: {event.model_dump_json(indent=None)}\n\n"
+-            )
++            payload = event.model_dump()
++            if isinstance(getattr(event, "item", None), ResponseOutputMessage):
++                payload["item"] = event.item.model_dump()
++            return f"event: {event_type}\ndata: {orjson.dumps(payload).decode()}\n\n"
+ 
+         # The streaming Response* event models echo ``tools`` through a
+         # narrower OpenAI SDK Tool union; strip it to avoid pydantic
+@@ -1947,21 +2150,29 @@
+             )
+         )
+ 
+-        chat_tools = self._response_tools_to_chat_tools(request)
+-        is_required = request.tool_choice == "required"
++        namespace_aliases = self._qwen_namespace_aliases(request)
++        chat_tools = self._response_tools_for_parser(request, namespace_aliases)
++        custom_names = custom_tool_names(request.tools)
++        namespaces = namespace_tool_names(request.tools)
++        declared_names = {
++            tool.name
++            for tool in request.tools or []
++            if tool.type in ("function", "custom") and tool.name
++        }
++        tool_choice = request.effective_tool_choice()
++        can_call_tools = bool(chat_tools) and tool_choice != "none"
++        is_required = tool_choice == "required" or isinstance(tool_choice, dict)
+         tool_parser: Optional[Union[FunctionCallParser, JsonArrayParser]] = None
+         if chat_tools and request.tool_choice != "none":
+-            native_supports_structural_tag = False
++            detector_owns_format = False
+             if self.tool_call_parser:
+                 probe = FunctionCallParser(
+                     chat_tools,
+                     self.tool_call_parser,
+                     tokenizer=self.tokenizer_manager.tokenizer,
+                 )
+-                native_supports_structural_tag = (
+-                    probe.detector.supports_structural_tag()
+-                )
+-            if is_required and not native_supports_structural_tag:
++                detector_owns_format = self._tool_parser_owns_format(probe)
++            if is_required and not detector_owns_format:
+                 tool_parser = JsonArrayParser()
+             elif self.tool_call_parser:
+                 tool_parser = FunctionCallParser(
+@@ -1983,6 +2194,15 @@
+                 tokenizer=self.tokenizer_manager.tokenizer,
+                 tool_call_parser_active=isinstance(tool_parser, FunctionCallParser),
+             )
++
++        # These parsers return unordered text/call pairs; isolate markup first.
++        split_qwen_markup = (
++            self.tokenizer_manager.model_config.hf_config.model_type
++            in {"qwen3_8_flash_next", "qwen3_8_flash_next_text", "qwen4_exp"}
++            and self.reasoning_parser in {None, "qwen3", "qwen3-thinking"}
++            and self.tool_call_parser in {None, "qwen3_coder"}
++            and (reasoning_parser_obj is not None or tool_parser is not None)
++        )
+ 
+         current_output_index = -1
+         reasoning_state = {
+@@ -2008,6 +2228,7 @@
+         total_tokens_meta = 0
+         reasoning_tokens_meta = 0
+         finish_reason: Optional[dict[str, Any]] = None
++        parsing_failed = False
+         flushed = False
+         stream_offset = 0
+         incremental = self.tokenizer_manager.server_args.incremental_streaming_output
+@@ -2027,17 +2248,10 @@
+             if not reasoning_state["open"]:
+                 return []
+             text = reasoning_state["text"]
+-            completed_item = ResponseReasoningItem(
+-                id=reasoning_state["item_id"],
+-                type="reasoning",
+-                summary=(
+-                    [ResponseReasoningSummary(type="summary_text", text=text)]
+-                    if wants_summary
+-                    else []
+-                ),
+-                content=[
+-                    ResponseReasoningTextContent(type="reasoning_text", text=text),
+-                ],
++            completed_item = self._make_reasoning_item(
++                request,
++                text,
++                item_id=reasoning_state["item_id"],
+                 status="completed",
+             )
+             events: list = []
+@@ -2104,7 +2318,7 @@
+             )
+             return item_id
+ 
+-        def _close_message_item():
++        def _close_message_item(phase: str = "final_answer"):
+             if not message_state["open"]:
+                 return []
+             text = message_state["text"]
+@@ -2117,6 +2331,7 @@
+                 role="assistant",
+                 content=[text_content],
+                 status="completed",
++                phase=phase,
+             )
+             events = [
+                 _send_event(
+@@ -2158,34 +2373,93 @@
+             if state is None or state.get("done"):
+                 return []
+             arguments = state["arguments"]
+-            completed_item = ResponseFunctionToolCall(
+-                arguments=arguments,
+-                call_id=state["call_id"],
+-                name=state["name"] or "",
+-                type="function_call",
+-                id=state["item_id"],
+-                status="completed",
+-            )
+-            events = [
++            events: list = []
++            if state["custom"]:
++                payload = decode_custom_tool_input(arguments)
++                # Deltas cannot be retracted, so a payload that no longer
++                # extends what was already streamed defers to the streamed text.
++                if not payload.startswith(state["payload"]):
++                    payload = state["payload"] or payload
++                remainder = payload[len(state["payload"]) :]
++                if remainder:
++                    state["payload"] = payload
++                    events.append(
++                        _send_event(
++                            openai_responses_types.ResponseCustomToolCallInputDeltaEvent(
++                                type="response.custom_tool_call_input.delta",
++                                sequence_number=-1,
++                                item_id=state["item_id"],
++                                output_index=state["output_index"],
++                                delta=remainder,
++                            )
++                        )
++                    )
++                completed_item = ResponseCustomToolCall(
++                    type="custom_tool_call",
++                    id=state["item_id"],
++                    call_id=state["call_id"],
++                    name=state["name"] or "",
++                    input=payload,
++                )
++                item_done_cls = openai_responses_types.ResponseOutputItemDoneEvent
++                events.append(
++                    _send_event(
++                        openai_responses_types.ResponseCustomToolCallInputDoneEvent(
++                            type="response.custom_tool_call_input.done",
++                            sequence_number=-1,
++                            item_id=state["item_id"],
++                            output_index=state["output_index"],
++                            input=payload,
++                        )
++                    )
++                )
++            else:
++                item_name, namespace = split_namespaced_call(
++                    state["name"] or "", namespaces, declared_names, namespace_aliases
++                )
++                if namespace is not None:
++                    completed_item = ResponseNamespacedFunctionToolCall(
++                        arguments=arguments,
++                        call_id=state["call_id"],
++                        name=item_name,
++                        namespace=namespace,
++                        type="function_call",
++                        id=state["item_id"],
++                        status="completed",
++                    )
++                    item_done_cls = ResponseNamespacedOutputItemDoneEvent
++                else:
++                    completed_item = ResponseFunctionToolCall(
++                        arguments=arguments,
++                        call_id=state["call_id"],
++                        name=item_name,
++                        type="function_call",
++                        id=state["item_id"],
++                        status="completed",
++                    )
++                    item_done_cls = openai_responses_types.ResponseOutputItemDoneEvent
++                events.append(
++                    _send_event(
++                        openai_responses_types.ResponseFunctionCallArgumentsDoneEvent(
++                            type="response.function_call_arguments.done",
++                            sequence_number=-1,
++                            item_id=state["item_id"],
++                            output_index=state["output_index"],
++                            arguments=arguments,
++                            name=item_name,
++                        )
++                    )
++                )
++            events.append(
+                 _send_event(
+-                    openai_responses_types.ResponseFunctionCallArgumentsDoneEvent(
+-                        type="response.function_call_arguments.done",
+-                        sequence_number=-1,
+-                        item_id=state["item_id"],
+-                        output_index=state["output_index"],
+-                        arguments=arguments,
+-                        name=state["name"] or "",
+-                    )
+-                ),
+-                _send_event(
+-                    openai_responses_types.ResponseOutputItemDoneEvent(
++                    item_done_cls(
+                         type="response.output_item.done",
+                         sequence_number=-1,
+                         output_index=state["output_index"],
+                         item=completed_item,
+                     )
+-                ),
+-            ]
++                )
++            )
+             emitted_items.append(completed_item)
+             state["done"] = True
+             return events
+@@ -2207,6 +2481,10 @@
+                     "reasoning_tokens", reasoning_tokens_meta
+                 )
+                 finish_reason = meta.get("finish_reason") or finish_reason
++                if self._status_from_finish_reason(finish_reason) == "failed":
++                    # A failed generation must not complete a partial tool item.
++                    parsing_failed = True
++                    break
+ 
+                 text = chunk.get("text", "") or ""
+                 if incremental:
+@@ -2224,234 +2502,329 @@
+                 )
+                 flushed = flushed or flush
+ 
+-                if reasoning_parser_obj is not None:
+-                    reasoning_chunk, delta = reasoning_parser_obj.parse_stream_chunk(
+-                        delta
+-                    )
+-                    if flush:
+-                        end_reasoning, end_normal = (
+-                            reasoning_parser_obj.parse_stream_end()
++                parts = (
++                    [part for part in re.split(r"(?=<)|(?<=>)", delta) if part] or [""]
++                    if split_qwen_markup
++                    else [delta]
++                )
++                flush_chunk = flush
++                for part_index, delta in enumerate(parts):
++                    # Flush buffered parser state once, after the terminal piece.
++                    flush = flush_chunk and part_index == len(parts) - 1
++                    if reasoning_parser_obj is not None:
++                        reasoning_chunk, delta = (
++                            reasoning_parser_obj.parse_stream_chunk(delta)
+                         )
+-                        if end_reasoning:
+-                            reasoning_chunk = (reasoning_chunk or "") + end_reasoning
+-                        if end_normal:
+-                            delta = (delta or "") + end_normal
+-                else:
+-                    reasoning_chunk = None
+-
+-                if reasoning_chunk:
+-                    if message_state["open"]:
+-                        for ev in _close_message_item():
+-                            yield ev
+-                    if not reasoning_state["open"]:
+-                        item_id = _open_reasoning_item()
+-                        yield _send_event(
+-                            openai_responses_types.ResponseOutputItemAddedEvent(
+-                                type="response.output_item.added",
+-                                sequence_number=-1,
+-                                output_index=reasoning_state["output_index"],
+-                                item=ResponseReasoningItem(
+-                                    id=item_id,
+-                                    type="reasoning",
+-                                    summary=[],
+-                                    content=[],
+-                                    status="in_progress",
+-                                ),
++                        if flush:
++                            end_reasoning, end_normal = (
++                                reasoning_parser_obj.parse_stream_end()
+                             )
+-                        )
+-                        # Clients that opt into ``reasoning.summary`` render
+-                        # off the ``reasoning_summary_text.*`` event stream,
+-                        # so mirror the trace into a summary part.
+-                        if wants_summary:
+-                            yield _send_event(
+-                                openai_responses_types.ResponseReasoningSummaryPartAddedEvent(
+-                                    type="response.reasoning_summary_part.added",
+-                                    item_id=item_id,
+-                                    output_index=reasoning_state["output_index"],
+-                                    summary_index=0,
+-                                    part=ResponseReasoningSummaryAddedPart(
+-                                        type="summary_text", text=""
+-                                    ),
+-                                    sequence_number=-1,
+-                                )
+-                            )
+-                    reasoning_state["text"] += reasoning_chunk
+-                    if wants_summary:
+-                        yield _send_event(
+-                            openai_responses_types.ResponseReasoningSummaryTextDeltaEvent(
+-                                type="response.reasoning_summary_text.delta",
+-                                item_id=reasoning_state["item_id"],
+-                                output_index=reasoning_state["output_index"],
+-                                summary_index=0,
+-                                delta=reasoning_chunk,
+-                                sequence_number=-1,
+-                            )
+-                        )
++                            if end_reasoning:
++                                reasoning_chunk = (
++                                    reasoning_chunk or ""
++                                ) + end_reasoning
++                            if end_normal:
++                                delta = (delta or "") + end_normal
+                     else:
+-                        yield _send_event(
+-                            openai_responses_types.ResponseReasoningTextDeltaEvent(
+-                                type="response.reasoning_text.delta",
+-                                item_id=reasoning_state["item_id"],
+-                                output_index=reasoning_state["output_index"],
+-                                content_index=0,
+-                                delta=reasoning_chunk,
+-                                sequence_number=-1,
+-                            )
+-                        )
+-
+-                if not delta and not flush:
+-                    continue
+-
+-                if isinstance(tool_parser, JsonArrayParser):
+-                    sp = tool_parser.parse_streaming_increment(delta, chat_tools)
+-                    normal_text, tool_calls = sp.normal_text or "", sp.calls
+-                elif tool_parser is not None:
+-                    normal_text, tool_calls = tool_parser.parse_stream_chunk(delta)
+-                    if flush:
+-                        end_text, end_calls = tool_parser.parse_stream_end()
+-                        normal_text = (normal_text or "") + end_text
+-                        tool_calls = list(tool_calls) + end_calls
+-                else:
+-                    normal_text, tool_calls = delta, []
+-
+-                def _emit_tool_calls(calls):
+-                    nonlocal current_output_index
+-                    if calls:
+-                        if reasoning_state["open"]:
+-                            for ev in _close_reasoning_item():
++                        reasoning_chunk = None
++
++                    if reasoning_chunk:
++                        if message_state["open"]:
++                            for ev in _close_message_item(phase="commentary"):
+                                 yield ev
+-                        if message_state["open"]:
+-                            for ev in _close_message_item():
+-                                yield ev
+-
+-                    for call in calls:
+-                        tool_index = call.tool_index
+-                        state = tool_call_states.get(tool_index)
+-                        if state is None or state.get("done"):
+-                            # Close other open calls first, so their
+-                            # output_item.done precedes the next added.
+-                            for other_index in list(tool_call_states):
+-                                if other_index != tool_index:
+-                                    for ev in _close_tool_call_state(other_index):
+-                                        yield ev
+-                            current_output_index += 1
+-                            item_id = f"fc_{random_uuid()[:8]}"
+-                            call_id = f"call_{random_uuid()[:24]}"
+-                            state = {
+-                                "item_id": item_id,
+-                                "call_id": call_id,
+-                                "output_index": current_output_index,
+-                                "name": call.name or "",
+-                                "arguments": "",
+-                                "added": False,
+-                                "done": False,
+-                            }
+-                            tool_call_states[tool_index] = state
+-                        if not state["added"]:
+-                            state["added"] = True
++                        if not reasoning_state["open"]:
++                            item_id = _open_reasoning_item()
+                             yield _send_event(
+                                 openai_responses_types.ResponseOutputItemAddedEvent(
+                                     type="response.output_item.added",
+                                     sequence_number=-1,
+-                                    output_index=state["output_index"],
+-                                    item=ResponseFunctionToolCall(
+-                                        arguments="",
+-                                        call_id=state["call_id"],
+-                                        name=state["name"],
+-                                        type="function_call",
+-                                        id=state["item_id"],
+-                                        status="in_progress",
+-                                    ),
+-                                )
+-                            )
+-                        if call.parameters:
+-                            state["arguments"] += call.parameters
+-                            yield _send_event(
+-                                openai_responses_types.ResponseFunctionCallArgumentsDeltaEvent(
+-                                    type="response.function_call_arguments.delta",
+-                                    sequence_number=-1,
+-                                    item_id=state["item_id"],
+-                                    output_index=state["output_index"],
+-                                    delta=call.parameters,
+-                                )
+-                            )
+-
+-                def _emit_normal_text():
+-                    if normal_text and _should_emit_normal_text_as_message(
+-                        normal_text,
+-                        any_tool_call_in_progress=any(
+-                            not s.get("done") for s in tool_call_states.values()
+-                        ),
+-                    ):
+-                        if reasoning_state["open"]:
+-                            for ev in _close_reasoning_item():
+-                                yield ev
+-                        for tool_index in list(tool_call_states):
+-                            for ev in _close_tool_call_state(tool_index):
+-                                yield ev
+-                        if not message_state["open"]:
+-                            item_id = _open_message_item()
+-                            yield _send_event(
+-                                openai_responses_types.ResponseOutputItemAddedEvent(
+-                                    type="response.output_item.added",
+-                                    sequence_number=-1,
+-                                    output_index=message_state["output_index"],
+-                                    item=ResponseOutputMessage(
++                                    output_index=reasoning_state["output_index"],
++                                    item=ResponseReasoningItem(
+                                         id=item_id,
+-                                        type="message",
+-                                        role="assistant",
++                                        type="reasoning",
++                                        summary=[],
+                                         content=[],
+                                         status="in_progress",
+                                     ),
+                                 )
+                             )
++                            # Clients that opt into ``reasoning.summary`` render
++                            # off the ``reasoning_summary_text.*`` event stream,
++                            # so mirror the trace into a summary part.
++                            if wants_summary:
++                                yield _send_event(
++                                    openai_responses_types.ResponseReasoningSummaryPartAddedEvent(
++                                        type="response.reasoning_summary_part.added",
++                                        item_id=item_id,
++                                        output_index=reasoning_state["output_index"],
++                                        summary_index=0,
++                                        part=ResponseReasoningSummaryAddedPart(
++                                            type="summary_text", text=""
++                                        ),
++                                        sequence_number=-1,
++                                    )
++                                )
++                        reasoning_state["text"] += reasoning_chunk
++                        if wants_summary:
+                             yield _send_event(
+-                                openai_responses_types.ResponseContentPartAddedEvent(
+-                                    type="response.content_part.added",
++                                openai_responses_types.ResponseReasoningSummaryTextDeltaEvent(
++                                    type="response.reasoning_summary_text.delta",
++                                    item_id=reasoning_state["item_id"],
++                                    output_index=reasoning_state["output_index"],
++                                    summary_index=0,
++                                    delta=reasoning_chunk,
+                                     sequence_number=-1,
++                                )
++                            )
++                        else:
++                            yield _send_event(
++                                openai_responses_types.ResponseReasoningTextDeltaEvent(
++                                    type="response.reasoning_text.delta",
++                                    item_id=reasoning_state["item_id"],
++                                    output_index=reasoning_state["output_index"],
++                                    content_index=0,
++                                    delta=reasoning_chunk,
++                                    sequence_number=-1,
++                                )
++                            )
++
++                    if not delta and not flush:
++                        continue
++
++                    if isinstance(tool_parser, JsonArrayParser):
++                        sp = tool_parser.parse_streaming_increment(delta, chat_tools)
++                        normal_text, tool_calls = sp.normal_text or "", sp.calls
++                    elif tool_parser is not None:
++                        normal_text, tool_calls = tool_parser.parse_stream_chunk(delta)
++                        if flush:
++                            end_text, end_calls = tool_parser.parse_stream_end()
++                            normal_text = (normal_text or "") + end_text
++                            tool_calls = list(tool_calls) + end_calls
++                    else:
++                        normal_text, tool_calls = delta, []
++
++                    def _emit_tool_calls(calls):
++                        nonlocal current_output_index
++                        if calls:
++                            if reasoning_state["open"]:
++                                for ev in _close_reasoning_item():
++                                    yield ev
++                            if message_state["open"]:
++                                for ev in _close_message_item(phase="commentary"):
++                                    yield ev
++
++                        for call in calls:
++                            tool_index = call.tool_index
++                            state = tool_call_states.get(tool_index)
++                            if state is None or state.get("done"):
++                                # Close other open calls first, so their
++                                # output_item.done precedes the next added.
++                                for other_index in list(tool_call_states):
++                                    if other_index != tool_index:
++                                        for ev in _close_tool_call_state(other_index):
++                                            yield ev
++                                current_output_index += 1
++                                name = call.name or ""
++                                is_custom = name in custom_names
++                                state = {
++                                    "item_id": (
++                                        f"ctc_{random_uuid()[:8]}"
++                                        if is_custom
++                                        else f"fc_{random_uuid()[:8]}"
++                                    ),
++                                    "call_id": f"call_{random_uuid()[:24]}",
++                                    "output_index": current_output_index,
++                                    "name": name,
++                                    "arguments": "",
++                                    "custom": is_custom,
++                                    "payload": "",
++                                    "added": False,
++                                    "done": False,
++                                }
++                                tool_call_states[tool_index] = state
++                            if not state["added"]:
++                                state["added"] = True
++                                if state["custom"]:
++                                    added_item = ResponseCustomToolCall(
++                                        type="custom_tool_call",
++                                        id=state["item_id"],
++                                        call_id=state["call_id"],
++                                        name=state["name"],
++                                        input="",
++                                    )
++                                    added_event_cls = (
++                                        openai_responses_types.ResponseOutputItemAddedEvent
++                                    )
++                                else:
++                                    item_name, namespace = split_namespaced_call(
++                                        state["name"] or "",
++                                        namespaces,
++                                        declared_names,
++                                        namespace_aliases,
++                                    )
++                                    if namespace is not None:
++                                        added_item = ResponseNamespacedFunctionToolCall(
++                                            arguments="",
++                                            call_id=state["call_id"],
++                                            name=item_name,
++                                            namespace=namespace,
++                                            type="function_call",
++                                            id=state["item_id"],
++                                            status="in_progress",
++                                        )
++                                        added_event_cls = (
++                                            ResponseNamespacedOutputItemAddedEvent
++                                        )
++                                    else:
++                                        added_item = ResponseFunctionToolCall(
++                                            arguments="",
++                                            call_id=state["call_id"],
++                                            name=item_name,
++                                            type="function_call",
++                                            id=state["item_id"],
++                                            status="in_progress",
++                                        )
++                                        added_event_cls = (
++                                            openai_responses_types.ResponseOutputItemAddedEvent
++                                        )
++                                yield _send_event(
++                                    added_event_cls(
++                                        type="response.output_item.added",
++                                        sequence_number=-1,
++                                        output_index=state["output_index"],
++                                        item=added_item,
++                                    )
++                                )
++                            if call.parameters:
++                                state["arguments"] += call.parameters
++                                if state["custom"]:
++                                    # The payload is a JSON string value inside the
++                                    # shim arguments, so un-escape what has arrived
++                                    # so far and stream only the new suffix.
++                                    decoded = decode_custom_tool_input_prefix(
++                                        state["arguments"]
++                                    )
++                                    if decoded.startswith(state["payload"]) and len(
++                                        decoded
++                                    ) > len(state["payload"]):
++                                        delta = decoded[len(state["payload"]) :]
++                                        state["payload"] = decoded
++                                        yield _send_event(
++                                            openai_responses_types.ResponseCustomToolCallInputDeltaEvent(
++                                                type="response.custom_tool_call_input.delta",
++                                                sequence_number=-1,
++                                                item_id=state["item_id"],
++                                                output_index=state["output_index"],
++                                                delta=delta,
++                                            )
++                                        )
++                                else:
++                                    yield _send_event(
++                                        openai_responses_types.ResponseFunctionCallArgumentsDeltaEvent(
++                                            type="response.function_call_arguments.delta",
++                                            sequence_number=-1,
++                                            item_id=state["item_id"],
++                                            output_index=state["output_index"],
++                                            delta=call.parameters,
++                                        )
++                                    )
++
++                    def _emit_normal_text():
++                        if normal_text and _should_emit_normal_text_as_message(
++                            normal_text,
++                            any_tool_call_in_progress=any(
++                                not s.get("done") for s in tool_call_states.values()
++                            ),
++                        ):
++                            if reasoning_state["open"]:
++                                for ev in _close_reasoning_item():
++                                    yield ev
++                            for tool_index in list(tool_call_states):
++                                for ev in _close_tool_call_state(tool_index):
++                                    yield ev
++                            if not message_state["open"]:
++                                item_id = _open_message_item()
++                                yield _send_event(
++                                    openai_responses_types.ResponseOutputItemAddedEvent(
++                                        type="response.output_item.added",
++                                        sequence_number=-1,
++                                        output_index=message_state["output_index"],
++                                        item=ResponseOutputMessage(
++                                            id=item_id,
++                                            type="message",
++                                            role="assistant",
++                                            content=[],
++                                            status="in_progress",
++                                            # Later tools or reasoning can make this commentary.
++                                            phase=(
++                                                None
++                                                if can_call_tools
++                                                or reasoning_parser_obj is not None
++                                                else "final_answer"
++                                            ),
++                                        ),
++                                    )
++                                )
++                                yield _send_event(
++                                    openai_responses_types.ResponseContentPartAddedEvent(
++                                        type="response.content_part.added",
++                                        sequence_number=-1,
++                                        output_index=message_state["output_index"],
++                                        item_id=message_state["item_id"],
++                                        content_index=0,
++                                        part=openai_responses_types.ResponseOutputText(
++                                            type="output_text",
++                                            text="",
++                                            annotations=[],
++                                            logprobs=None,
++                                        ),
++                                    )
++                                )
++                            message_state["text"] += normal_text
++                            yield _send_event(
++                                openai_responses_types.ResponseTextDeltaEvent(
++                                    type="response.output_text.delta",
++                                    sequence_number=-1,
++                                    content_index=0,
+                                     output_index=message_state["output_index"],
+                                     item_id=message_state["item_id"],
+-                                    content_index=0,
+-                                    part=openai_responses_types.ResponseOutputText(
+-                                        type="output_text",
+-                                        text="",
+-                                        annotations=[],
+-                                        logprobs=None,
+-                                    ),
++                                    delta=normal_text,
++                                    logprobs=[],
+                                 )
+                             )
+-                        message_state["text"] += normal_text
+-                        yield _send_event(
+-                            openai_responses_types.ResponseTextDeltaEvent(
+-                                type="response.output_text.delta",
+-                                sequence_number=-1,
+-                                content_index=0,
+-                                output_index=message_state["output_index"],
+-                                item_id=message_state["item_id"],
+-                                delta=normal_text,
+-                                logprobs=[],
+-                            )
+-                        )
+-
+-                # The parser's (text, calls) tuple is unordered, but positions
+-                # are recoverable: continuing arguments precede this delta's
+-                # text, a newly opened call follows it. Classify first --
+-                # emitting mutates tool_call_states.
+-                def _is_continuing(call):
+-                    state = tool_call_states.get(call.tool_index)
+-                    return state is not None and not state.get("done")
+-
+-                continuing = [c for c in tool_calls if _is_continuing(c)]
+-                opening = [c for c in tool_calls if not _is_continuing(c)]
+-
+-                for ev in _emit_tool_calls(continuing):
+-                    yield ev
+-                for ev in _emit_normal_text():
+-                    yield ev
+-                for ev in _emit_tool_calls(opening):
+-                    yield ev
+-        except Exception:
+-            logger.exception("Error while streaming /v1/responses")
++
++                    # The parser's (text, calls) tuple is unordered, but positions
++                    # are recoverable: continuing arguments precede this delta's
++                    # text, a newly opened call follows it. Classify first --
++                    # emitting mutates tool_call_states.
++                    def _is_continuing(call):
++                        state = tool_call_states.get(call.tool_index)
++                        return state is not None and not state.get("done")
++
++                    continuing = [c for c in tool_calls if _is_continuing(c)]
++                    opening = [c for c in tool_calls if not _is_continuing(c)]
++
++                    for ev in _emit_tool_calls(continuing):
++                        yield ev
++                    for ev in _emit_normal_text():
++                        yield ev
++                    for ev in _emit_tool_calls(opening):
++                        yield ev
++        except Qwen3CoderParseError as e:
++            logger.warning("Invalid Qwen tool output for %s: %s", request.request_id, e)
++            if finish_reason is None:
++                self.tokenizer_manager.abort_request(rid=request.request_id)
++            parsing_failed = True
++            if not (
++                isinstance(e, IncompleteQwen3CoderToolCall)
++                and finish_reason
++                and finish_reason.get("type") == "length"
++            ):
++                finish_reason = {"type": "error", "message": str(e)}
++        except Exception as e:
++            logger.exception(
++                "Error while streaming /v1/responses %s", request.request_id
++            )
+             failed = _sanitize_response_dict(
+                 ResponsesResponse.from_request(
+                     request,
+@@ -2463,6 +2836,7 @@
+                     usage=None,
+                 ).model_dump()
+             )
++            failed["error"] = {"code": "server_error", "message": str(e)}
+             yield _send_event(
+                 openai_responses_types.ResponseFailedEvent(
+                     type="response.failed",
+@@ -2472,13 +2846,14 @@
+             )
+             return
+ 
+-        for ev in _close_reasoning_item():
+-            yield ev
+-        for ev in _close_message_item():
+-            yield ev
+-        for tool_index in list(tool_call_states):
+-            for ev in _close_tool_call_state(tool_index):
++        if not parsing_failed:
++            for ev in _close_reasoning_item():
+                 yield ev
++            for ev in _close_message_item():
++                yield ev
++            for tool_index in list(tool_call_states):
++                for ev in _close_tool_call_state(tool_index):
++                    yield ev
+ 
+         final_output_items = list(emitted_items)
+ 
+@@ -2503,21 +2878,22 @@
+             status=self._status_from_finish_reason(finish_reason),
+             usage=usage,
+         )
++        final_response.error = self._error_from_finish_reason(finish_reason)
+         if request.store:
+             async with self.response_store_lock:
+                 stored = self.response_store.get(final_response.id)
+                 if stored is None or stored.status != "cancelled":
+                     self.response_store[final_response.id] = final_response
++                    self.msg_store[final_response.id] = self._response_input_history(
++                        request
++                    ) + [
++                        item.model_dump(exclude_none=True)
++                        for item in final_response.output
++                    ]
+ 
+         response_dict = _sanitize_response_dict(final_response.model_dump())
+ 
+-        yield _send_event(
+-            openai_responses_types.ResponseCompletedEvent(
+-                type="response.completed",
+-                sequence_number=-1,
+-                response=response_dict,
+-            )
+-        )
++        yield _send_event(self._terminal_stream_event(response_dict))
+ 
+     async def _generate_with_builtin_tools(
+         self,
+--- a/python/sglang/srt/function_call/qwen3_coder_detector.py
++++ b/python/sglang/srt/function_call/qwen3_coder_detector.py
+@@ -18,6 +18,16 @@
+ logger = logging.getLogger(__name__)
+ 
+ 
++class Qwen3CoderParseError(RuntimeError):
++    """Generated native tool syntax cannot be interpreted without losing data."""
++
++
++class IncompleteQwen3CoderToolCall(Qwen3CoderParseError):
++    def __init__(self):
++        super().__init__("Generation ended inside an unfinished Qwen tool call.")
++        self.normal_text = ""
++
++
+ class Qwen3CoderDetector(BaseFormatDetector):
+     def __init__(self):
+         super().__init__()
+@@ -56,6 +66,7 @@
+ 
+         # Initialize attributes that were missing in the original PR
+         self.current_func_name: Optional[str] = None
++        self.completed_functions_in_tool_call = 0
+ 
+     def has_tool_call(self, text: str) -> bool:
+         return self.tool_call_start_token in text
+@@ -178,6 +189,15 @@
+         if self.tool_call_start_token not in text:
+             return StreamingParseResult(normal_text=text)
+ 
++        # Use the streaming grammar to catch content the regex fallback drops.
++        validator = type(self)()
++        parsed = validator.parse_streaming_increment(text, tools)
++        try:
++            validator.finish(tools)
++        except IncompleteQwen3CoderToolCall as e:
++            e.normal_text = parsed.normal_text
++            raise
++
+         calls = []
+         try:
+             # Simple cleanup of the text to find tool calls
+@@ -268,17 +288,24 @@
+             # 1. Priority detection: check if it's the start of Tool Call
+             # -------------------------------------------------------
+             if current_slice.startswith(self.tool_call_start_token):
++                if self.is_inside_tool_call or self.current_func_name is not None:
++                    raise Qwen3CoderParseError("Nested Qwen tool call opening.")
+                 self.parsed_pos += len(self.tool_call_start_token)
+                 self.is_inside_tool_call = True
++                self.completed_functions_in_tool_call = 0
+                 continue
+ 
+             # -------------------------------------------------------
+             # 2. Function Name: <function=name>
+             # -------------------------------------------------------
+             if current_slice.startswith(self.tool_call_prefix):
++                if self.current_func_name is not None:
++                    raise Qwen3CoderParseError("Nested Qwen function opening.")
+                 end_angle = current_slice.find(">")
+                 if end_angle != -1:
+                     func_name = current_slice[len(self.tool_call_prefix) : end_angle]
++                    if not func_name.strip() or "<" in func_name:
++                        raise Qwen3CoderParseError("Invalid Qwen function name tag.")
+ 
+                     self.current_tool_id += 1
+                     self.current_tool_name_sent = True
+@@ -304,8 +331,13 @@
+             # 3. Parameter: <parameter=name>value...
+             # -------------------------------------------------------
+             if current_slice.startswith(self.parameter_prefix):
++                if self.current_func_name is None:
++                    raise Qwen3CoderParseError("Qwen parameter outside a function.")
+                 name_end = current_slice.find(">")
+                 if name_end != -1:
++                    param_name = current_slice[len(self.parameter_prefix) : name_end]
++                    if not param_name.strip() or "<" in param_name:
++                        raise Qwen3CoderParseError("Invalid Qwen parameter name tag.")
+                     value_start_idx = name_end + 1
+                     rest_of_slice = current_slice[value_start_idx:]
+ 
+@@ -388,6 +420,8 @@
+             # 4. Function End: </function>
+             # -------------------------------------------------------
+             if current_slice.startswith(self.function_end_token):
++                if self.current_func_name is None:
++                    raise Qwen3CoderParseError("Qwen function closing without opening.")
+                 if not self.json_started:
+                     calls.append(
+                         ToolCallItem(tool_index=self.current_tool_id, parameters="{")
+@@ -399,12 +433,21 @@
+                 )
+                 self.parsed_pos += len(self.function_end_token)
+                 self.current_func_name = None
++                self.completed_functions_in_tool_call += 1
+                 continue
+ 
+             # -------------------------------------------------------
+             # 5. Tool Call End: </tool_call>
+             # -------------------------------------------------------
+             if current_slice.startswith(self.tool_call_end_token):
++                if (
++                    not self.is_inside_tool_call
++                    or self.current_func_name is not None
++                    or not self.completed_functions_in_tool_call
++                ):
++                    raise Qwen3CoderParseError(
++                        "Qwen tool wrapper has no complete function."
++                    )
+                 self.parsed_pos += len(self.tool_call_end_token)
+                 self.is_inside_tool_call = False  # [FIX] Exit tool call region
+                 continue
+@@ -422,7 +465,10 @@
+                 # This entire segment is plain text
+                 if not self.is_inside_tool_call:
+                     normal_text_chunks.append(current_slice)
+-                # [FIX] If inside tool call, discard this text (usually \n), don't append
++                elif current_slice.strip():
++                    raise Qwen3CoderParseError(
++                        "Unexpected content inside a Qwen tool call."
++                    )
+                 self.parsed_pos += len(current_slice)
+                 continue
+ 
+@@ -450,6 +496,10 @@
+                     # Just a plain '<' symbol
+                     if not self.is_inside_tool_call:
+                         normal_text_chunks.append("<")
++                    else:
++                        raise Qwen3CoderParseError(
++                            "Unexpected tag inside a Qwen tool call."
++                        )
+                     self.parsed_pos += 1
+                     continue
+ 
+@@ -458,7 +508,10 @@
+                 text_segment = current_slice[:next_open_angle]
+                 if not self.is_inside_tool_call:
+                     normal_text_chunks.append(text_segment)
+-                # [FIX] If inside tool call, discard whitespace/text before Tag
++                elif text_segment.strip():
++                    raise Qwen3CoderParseError(
++                        "Unexpected content inside a Qwen tool call."
++                    )
+                 self.parsed_pos += next_open_angle
+                 continue
+ 
+@@ -471,6 +524,13 @@
+         normal_text = "".join(normal_text_chunks) if normal_text_chunks else ""
+         return StreamingParseResult(calls=calls, normal_text=normal_text)
+ 
++    def finish(self, tools: List[Tool]) -> StreamingParseResult:
++        if self.is_inside_tool_call or self.current_func_name is not None:
++            raise IncompleteQwen3CoderToolCall()
++        # A partial marker outside a tool block can just be ordinary text.
++        text, self._buffer = self._buffer, ""
++        return StreamingParseResult(normal_text=text)
++
+     def supports_structural_tag(self) -> bool:
+         return True
+ 
+--- a/python/sglang/srt/managers/schedule_batch.py
++++ b/python/sglang/srt/managers/schedule_batch.py
+@@ -1603,8 +1603,14 @@
+                     )
+                 if self.eos_token_ids:
+                     self.output_ids[offset] = next(iter(self.eos_token_ids))
+-                self.finished_reason = FINISH_MATCHED_STR(matched="NaN happened")
+-                self.finished_len = offset + 1
++                self.finished_reason = FINISH_ABORT(
++                    "Generation produced an invalid token ID.",
++                    status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
++                    err_type="InvalidTokenError",
++                )
++                # Never emit the faulty token or let a speculative overrun hide
++                # the engine failure behind an ordinary length finish.
++                self.finished_len = min(offset, self.sampling_params.max_new_tokens)
+                 return True
+ 
+         return False
+@@ -1632,9 +1638,8 @@
+ 
+         new_accepted_tokens = self.output_ids[-new_accepted_len:]
+ 
+-        # Sanitize out-of-range / NaN token ids before any decode.
++        # Reject out-of-range token IDs before any decode.
+         if self._check_vocab_boundary_finish(new_accepted_tokens):
+-            self._cap_finished_len_at_max_new_tokens()
+             return
+ 
+         # Stop string beats EOS/stop-token matched in the same step (speculative
+--- a/python/sglang/srt/multimodal/processors/qwen_vl.py
++++ b/python/sglang/srt/multimodal/processors/qwen_vl.py
+@@ -314,6 +314,7 @@
+             "qwen3_5",
+             "qwen3_5_moe",
+             "qwen4_exp",
++            "qwen3_8_flash_next",
+             "intern_s2_preview",
+             "interns2_mobius",
+         ):
+@@ -525,6 +526,7 @@
+             "qwen3_5",
+             "qwen3_5_moe",
+             "qwen4_exp",
++            "qwen3_8_flash_next",
+             "intern_s2_preview",
+             "interns2_mobius",
+         ):
+@@ -662,6 +664,7 @@
+                 "qwen3_5",
+                 "qwen3_5_moe",
+                 "qwen4_exp",
++                "qwen3_8_flash_next",
+                 "intern_s2_preview",
+             ]
+             and video_timestamps is not None
+@@ -771,6 +774,7 @@
+             "qwen3_5",
+             "qwen3_5_moe",
+             "qwen4_exp",
++            "qwen3_8_flash_next",
+             "intern_s2_preview",
+             "interns2_mobius",
+         ):

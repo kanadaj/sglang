@@ -4,6 +4,14 @@ Publishable source and deployment package for the locally accepted Qwen3.8
 Flash-Next LIL NVFP4 stack. **No model weights, container archives, credentials,
 private prompts, routing snapshots or failed optimization experiments.**
 
+## Optional Responses API profile
+
+[Responses, reasoning-effort aliases and image/video input fixes](docs/responses-api.md)
+adds an opt-in profile on top of the current Chat effort image. It includes ordered
+streaming/replay, namespace and custom tools, per-request thinking controls and
+image-bearing tool results. **Short-video chronological ordering remains unresolved.**
+Existing image profiles and serving flags are unchanged; no HiCache changes are included.
+
 ## Current production (2026-09-13)
 
 **[Chat reasoning-effort fix: contract, image, tests and rollout](docs/chat-reasoning-effort.md)**.
