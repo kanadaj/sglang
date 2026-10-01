@@ -1,15 +1,15 @@
-# Production launch — LIVE reference (verified against GPUStack model 48, 2026-09-22)
-# Image: hicache-pr19-embed = cumulative 0015-0019 + 0020-0033 + 0034-embedded-model-overrides
-#        + 0046-yarn-factor + PR#19 hicache checkpoint patches 0040-0045.
+# Historical production launch snapshot (GPUStack model 48, 2026-09-22).
+# Image: embedded overrides + PR#19 HiCache checkpoint patches 0040-0045.
+# It does NOT include 0046-qwen-disable-tool-grammar; see quickstart-docker.md
+# for the new, separately published tool-grammar image and its trade-offs.
 # Example only: do not run on occupied GPUs/ports. Requires a complete local checkpoint.
 #
 # KEY CHANGE vs older revisions of this file: the ~2.8 KB --json-model-override-args
 # blob (vocab/layers/layer_types/MTP/PLE/ngram/indexer fields) is EMBEDDED in the
 # image at /opt/qwen-runtime/model_overrides.json and merged automatically at
 # startup (log: "Merged CLI model overrides onto embedded model config ...").
-# Only the YaRN extension stays explicit — here as a small CLI override (equivalent
-# alternative: -e SGLANG_YARN_ROPE_SCALING_FACTOR=4.0 with context-length, no CLI arg;
-# see docs/embedded-model-overrides.md).
+# Only the YaRN extension stays explicit as a small CLI override; no
+# SGLANG_YARN_ROPE_SCALING_FACTOR env override exists in this image.
 #
 # GPUStack env for this deployment (beyond embedded overrides):
 #   HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 OMP_NUM_THREADS=1
@@ -33,7 +33,7 @@ docker run --rm --gpus '"device=2,3"' --ipc=host -p 127.0.0.1:30000:30000 \
   -e HF_HUB_OFFLINE=1 -e TRANSFORMERS_OFFLINE=1 \
   -e PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
   -e SAFETENSORS_FAST_GPU=1 -e OMP_NUM_THREADS=1 \
-  docker.io/kanadaj/sglang-qwen38fn-sm120-turbo:hicache-pr19-embed-20260921-v1@sha256:6acf6306887726b31ad0003de9021fdf0147ffbb1a29a4e3147421bf5063d1e2 \
+  docker.io/kanadaj/sglang-qwen38fn-sm120-turbo@sha256:6acf6306887726b31ad0003de9021fdf0147ffbb1a29a4e3147421bf5063d1e2 \
   --model-path /model \
   --enable-metrics \
   --uvicorn-access-log-exclude-prefixes /metrics \

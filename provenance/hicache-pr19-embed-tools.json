@@ -1,0 +1,40 @@
+{
+  "profile": "hicache-pr19-embed-tools",
+  "base_image": "docker.io/kanadaj/sglang-qwen38fn-sm120-turbo@sha256:6acf6306887726b31ad0003de9021fdf0147ffbb1a29a4e3147421bf5063d1e2",
+  "parent_profile": "hicache-pr19-embed",
+  "parent_inventory_sha256": "8732b16781666b01b7050159696e667753c9f2ba764b8a91ad63f7bf239e3b7c",
+  "source_files": 4396,
+  "result_inventory_sha256": "1edc1cba25f275066c2e5a217346635e651f6654e21ac7faef46111ec01330a3",
+  "patches": [
+    {
+      "file": "0046-qwen-disable-tool-grammar.patch",
+      "sha256": "1a6019935553f790c06698a3a390e9a092ef48f7328f8ce482fae144873bbc38",
+      "files": {
+        "python/sglang/srt/entrypoints/openai/serving_chat.py": {
+          "before": "7ae4971c0e3b16c6afe01cda092d67995bac50a70a501b2e8c5d5ab4b3253158",
+          "after": "36f63c84923243a653e5d54b58255cc833d61e2436df780bb32b283583092a78"
+        },
+        "python/sglang/srt/constrained/grammar_manager.py": {
+          "before": "dc4c94674191877a689c671713c739ab4693675f4fd26f68331a4751ecbc1903",
+          "after": "447427f83aeeb96adf12a0ab293760ed6877ef23e10561cd5ceedf3606d9c0bc"
+        }
+      }
+    },
+    {
+      "file": "0047-qwen-preserve-tool-strictness-without-grammar.patch",
+      "sha256": "53704c8c2f7333ec71409296c77db805ac06926561aff9a5fa38c7003ed3eefb",
+      "files": {
+        "python/sglang/srt/entrypoints/openai/serving_chat.py": {
+          "before": "36f63c84923243a653e5d54b58255cc833d61e2436df780bb32b283583092a78",
+          "after": "518605601bede05c3fd127f2ff23ad6dc7cee2e16bc7b97b1d7c7c040428cf7e"
+        },
+        "python/sglang/srt/entrypoints/openai/serving_responses.py": {
+          "before": "9c780b2f915fed4147b90d37e78b52b9620e80301be8484a3e6f40b86c0b2791",
+          "after": "9426aaca150588d657803c169721e52ea2131bd4a5d1753ebf833ba915d5fa47"
+        }
+      }
+    }
+  ],
+  "series_file": "patches/series.hicache-pr19-embed-tools",
+  "series_sha256": "edde635d0f7aef77bb3762b56b279318426b1dac0bfd1c1b1c8648d5ac527fdd"
+}

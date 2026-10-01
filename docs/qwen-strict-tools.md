@@ -42,10 +42,13 @@ retained as an unapplied patch for provenance, not included in this profile.
 The CPU runner uses no GPU or network and requires existing tokenizer files.
 No package installation, cache migration or service restart is performed by tests.
 
-The HiCache image also contains0046, but retains its normal backend default.
-Use the explicit none setting in [the production recipe](hicache-production-recipe.md)
-to obtain the same behavior. Rebuild first: the flag alone on an older image can
-abort constrained requests instead of bypassing grammar work.
+The newly published `hicache-pr19-embed-tools` image contains `0046` plus
+`0047`, which makes the historical Qwen strict-by-default wrapper a no-op only
+when grammar is disabled. The historical `hicache-pr19-embed` image has neither
+patch. The new image retains its normal grammar backend default; use explicit
+`--grammar-backend=none` as in the [quickstart](quickstart-docker.md) to opt in.
+The flag alone on the older image can abort constrained requests instead of
+bypassing grammar work.
 
 ## Validation scope
 
