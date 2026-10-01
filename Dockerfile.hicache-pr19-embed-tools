@@ -1,0 +1,14 @@
+# Audited cumulative runtime: PR#19 checkpoint fixes on embedded overrides,
+# plus 0046 grammar bypass and 0047 preservation of client tool strictness
+# when --grammar-backend=none is explicitly selected.
+# The pinned parent remains a separately verifiable 0040-0045 image.
+FROM docker.io/kanadaj/sglang-qwen38fn-sm120-turbo@sha256:6acf6306887726b31ad0003de9021fdf0147ffbb1a29a4e3147421bf5063d1e2
+COPY patches/0040-hicache-checkpoint-preservation.patch patches/0041-hicache-prefetch-namespace.patch patches/0042-hicache-writeback-admission.patch patches/0043-hicache-repeat-publication-diagnostics.patch patches/0044-hicache-advanced-prefix-retry.patch patches/0045-hicache-sparse-host-refill.patch patches/0046-qwen-disable-tool-grammar.patch patches/0047-qwen-preserve-tool-strictness-without-grammar.patch patches/series.hicache-pr19-embed patches/series.hicache-pr19-embed-tools /opt/hicache-pr19-embed-tools/patches/
+COPY provenance/hicache-pr19-embed-runtime-files.json provenance/hicache-pr19-embed.json provenance/hicache-pr19-embed-tools.json /opt/hicache-pr19-embed-tools/provenance/
+COPY scripts/verify_hicache_pr19_embed.py scripts/verify_hicache_pr19_embed_tools.py /opt/hicache-pr19-embed-tools/scripts/
+RUN python3 -B /opt/hicache-pr19-embed-tools/scripts/verify_hicache_pr19_embed_tools.py --tree /sgl-workspace/sglang --apply
+LABEL org.opencontainers.image.source="https://github.com/kanadaj/sglang" \
+      io.github.kanadaj.sglang.profile="hicache-pr19-embed-tools" \
+      io.github.kanadaj.sglang.parent="sha256:6acf6306887726b31ad0003de9021fdf0147ffbb1a29a4e3147421bf5063d1e2"
+ENTRYPOINT ["python3", "-m", "sglang.launch_server"]
+CMD ["--help"]
