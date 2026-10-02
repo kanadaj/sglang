@@ -1,0 +1,52 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.qwen-chat-tools
+#1 transferring dockerfile: 1.45kB done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/kanadaj/sglang-qwen38fn-sm120-turbo@sha256:09a132dbfcd2eb4579324c8400e991135aca823a900ee8efe47459daa4931b39
+#2 DONE 0.4s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 134B done
+#3 DONE 0.1s
+
+#4 [internal] load build context
+#4 DONE 0.0s
+
+#5 [1/6] FROM docker.io/kanadaj/sglang-qwen38fn-sm120-turbo@sha256:09a132dbfcd2eb4579324c8400e991135aca823a900ee8efe47459daa4931b39
+#5 resolve docker.io/kanadaj/sglang-qwen38fn-sm120-turbo@sha256:09a132dbfcd2eb4579324c8400e991135aca823a900ee8efe47459daa4931b39 0.1s done
+#5 DONE 0.1s
+
+#4 [internal] load build context
+#4 transferring context: 1.87MB done
+#4 DONE 0.1s
+
+#6 [2/6] RUN test -n "9b785cac47c2f6c3a1c1b3226de1d13fe019feeb-uncommitted-candidate"
+#6 CACHED
+
+#7 [3/6] COPY patches/ /opt/qwen-chat-tools/patches/
+#7 DONE 0.2s
+
+#8 [4/6] COPY provenance/hicache-pr19-embed-runtime-files.json provenance/hicache-pr19-embed.json provenance/hicache-pr19-embed-tools.json provenance/qwen-chat-tools.json provenance/qwen-chat-tools-runtime-files.json /opt/qwen-chat-tools/provenance/
+#8 DONE 0.2s
+
+#9 [5/6] COPY scripts/verify_hicache_pr19_embed.py scripts/verify_hicache_pr19_embed_tools.py scripts/verify_qwen_chat_tools.py /opt/qwen-chat-tools/scripts/
+#9 DONE 0.2s
+
+#10 [6/6] RUN python3 -B /opt/qwen-chat-tools/scripts/verify_qwen_chat_tools.py --tree /sgl-workspace/sglang --apply
+#10 0.681 {"profile": "qwen-chat-tools", "parent": "hicache-pr19-embed-tools", "source_files": 4396, "changed_source_files": 4, "full_tree_verified": true, "clean_patch_apply": true}
+#10 DONE 0.7s
+
+#11 exporting to image
+#11 exporting layers
+#11 exporting layers 0.6s done
+#11 exporting manifest sha256:f2f96548b0f3cd66acbd366009f51125e516b74e9891c7b9703dfc7b5af283f7 0.0s done
+#11 exporting config sha256:c250a54ba333419243f2229e5495342c32d9f7d3dd6557e430e3afe9cd41654f 0.0s done
+#11 exporting attestation manifest sha256:6ca6610abfb1592ba9eaf0f1a2530c7c415963a8db37af87286c6c32c6f12732 0.0s done
+#11 exporting manifest list sha256:dc1e95252da5736a11b869745c5c7c9737257409db89d4f92c525482d4ba62d6
+#11 exporting manifest list sha256:dc1e95252da5736a11b869745c5c7c9737257409db89d4f92c525482d4ba62d6 0.0s done
+#11 naming to docker.io/kanadaj/sglang-qwen38fn-sm120-turbo:qwen-chat-tools-20261002-reviewed-candidate done
+#11 unpacking to docker.io/kanadaj/sglang-qwen38fn-sm120-turbo:qwen-chat-tools-20261002-reviewed-candidate
+#11 unpacking to docker.io/kanadaj/sglang-qwen38fn-sm120-turbo:qwen-chat-tools-20261002-reviewed-candidate 0.2s done
+#11 DONE 1.0s

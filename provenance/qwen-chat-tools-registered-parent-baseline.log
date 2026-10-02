@@ -1,0 +1,22 @@
+.................................................................FFFFFFF [ 22%]
+FFFFFFFF................................................................ [ 45%]
+........................................................................ [ 67%]
+................................................................................ [ 92%]
+.......................                                                  [100%]
+=========================== short test summary info ============================
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV32Detector::test_detect_and_parse_json_format
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV32Detector::test_detect_and_parse_no_parameters
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV32Detector::test_detect_and_parse_xml_format
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV32Detector::test_get_model_structural_tag
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV32Detector::test_self_closing_zero_arg_invoke
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV32Detector::test_streaming_json_format
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV32Detector::test_streaming_no_parameters
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV32Detector::test_streaming_no_parameters_with_whitespace
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV32Detector::test_streaming_xml_format
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV4Detector::test_detect_and_parse_xml_format
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV4Detector::test_get_model_structural_tag
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV4Detector::test_self_closing_mixed_with_long_form
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV4Detector::test_self_closing_zero_arg_invoke
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV4Detector::test_streaming_self_closing_invoke
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV4Detector::test_streaming_xml_format
+15 failed, 304 passed, 17 warnings, 64 subtests passed in 7.83s

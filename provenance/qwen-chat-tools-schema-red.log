@@ -1,0 +1,61 @@
+FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF                         [100%]
+=============================== warnings summary ===============================
+../../usr/local/lib/python3.12/dist-packages/_pytest/cacheprovider.py:469
+  /usr/local/lib/python3.12/dist-packages/_pytest/cacheprovider.py:469: PytestCacheWarning: could not create cache path /candidate/validation/qwen-chat-tools/.pytest_cache/v/cache/nodeids: [Errno 30] Read-only file system: '/candidate/validation/qwen-chat-tools/pytest-cache-files-59q8jwmp'
+    config.cache.set("cache/nodeids", sorted(self.cached_nodeids))
+
+../../usr/local/lib/python3.12/dist-packages/_pytest/cacheprovider.py:423
+  /usr/local/lib/python3.12/dist-packages/_pytest/cacheprovider.py:423: PytestCacheWarning: could not create cache path /candidate/validation/qwen-chat-tools/.pytest_cache/v/cache/lastfailed: [Errno 30] Read-only file system: '/candidate/validation/qwen-chat-tools/pytest-cache-files-zd5qrpea'
+    config.cache.set("cache/lastfailed", self.lastfailed)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[integer-42-42-None-anyOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[integer-42-42-None-oneOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[integer-42-42-None-allOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[integer-42-42-1-anyOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[integer-42-42-1-oneOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[integer-42-42-1-allOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[integer-42-42-7-anyOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[integer-42-42-7-oneOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[integer-42-42-7-allOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[integer-42-42-10000-anyOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[integer-42-42-10000-oneOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[integer-42-42-10000-allOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[boolean-true-True-None-anyOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[boolean-true-True-None-oneOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[boolean-true-True-None-allOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[boolean-true-True-1-anyOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[boolean-true-True-1-oneOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[boolean-true-True-1-allOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[boolean-true-True-7-anyOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[boolean-true-True-7-oneOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[boolean-true-True-7-allOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[boolean-true-True-10000-anyOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[boolean-true-True-10000-oneOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[boolean-true-True-10000-allOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[object-{"x": 1}-expected2-None-anyOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[object-{"x": 1}-expected2-None-oneOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[object-{"x": 1}-expected2-None-allOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[object-{"x": 1}-expected2-1-anyOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[object-{"x": 1}-expected2-1-oneOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[object-{"x": 1}-expected2-1-allOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[object-{"x": 1}-expected2-7-anyOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[object-{"x": 1}-expected2-7-oneOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[object-{"x": 1}-expected2-7-allOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[object-{"x": 1}-expected2-10000-anyOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[object-{"x": 1}-expected2-10000-oneOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[object-{"x": 1}-expected2-10000-allOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[array-[1, 2]-expected3-None-anyOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[array-[1, 2]-expected3-None-oneOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[array-[1, 2]-expected3-None-allOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[array-[1, 2]-expected3-1-anyOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[array-[1, 2]-expected3-1-oneOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[array-[1, 2]-expected3-1-allOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[array-[1, 2]-expected3-7-anyOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[array-[1, 2]-expected3-7-oneOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[array-[1, 2]-expected3-7-allOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[array-[1, 2]-expected3-10000-anyOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[array-[1, 2]-expected3-10000-oneOf]
+FAILED ../../candidate/validation/qwen-chat-tools/test_schema.py::test_composite_schema[array-[1, 2]-expected3-10000-allOf]
+48 failed, 2 warnings in 6.44s

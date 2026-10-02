@@ -1,0 +1,95 @@
+--- a/python/sglang/srt/parser/reasoning_parser.py
++++ b/python/sglang/srt/parser/reasoning_parser.py
+@@ -70,6 +70,7 @@
+         force_reasoning: bool = False,
+         stream_reasoning: bool = True,
+         tool_start_token: Optional[str] = None,
++        defer_tool_start: bool = False,
+         continue_final_message: bool = False,
+         previous_content: str = "",
+         thinks_internally: bool = False,
+@@ -80,6 +81,8 @@
+         self.think_end_token = think_end_token
+         self.think_excluded_tokens = think_excluded_tokens
+         self.tool_start_token = tool_start_token
++        self.defer_tool_start = defer_tool_start
++        self._tool_start_pending = False
+         self.force_reasoning = force_reasoning
+         self._in_reasoning = force_reasoning
+         self.stream_reasoning = stream_reasoning
+@@ -218,6 +221,7 @@
+ 
+             self._buffer = ""
+             self._in_reasoning = False
++            self._tool_start_pending = False
+             normal_text = current_text[end_idx + len(self.think_end_token) :]
+ 
+             return StreamingParseResult(
+@@ -226,10 +230,20 @@
+ 
+         # Continue with reasoning content
+         if self._in_reasoning:
++            if self._tool_start_pending:
++                return StreamingParseResult()
+             # Check for tool_start_token interruption. Streaming cannot see a
+             # think_end_token that has not arrived yet; see the chunk_dependent test.
+             if self.tool_start_token and self.tool_start_token in current_text:
+                 tool_idx = current_text.find(self.tool_start_token)
++                if self.defer_tool_start:
++                    # Match non-stream parsing: a later explicit close wins over
++                    # quoted tool markup; only EOS makes this an implicit close.
++                    self._tool_start_pending = True
++                    if not self.stream_reasoning:
++                        return StreamingParseResult()
++                    self._buffer = current_text[tool_idx:]
++                    return StreamingParseResult(reasoning_text=current_text[:tool_idx])
+                 reasoning_text = current_text[:tool_idx]
+                 # Preserve tool_start_token in normal text
+                 normal_text = current_text[tool_idx:]
+@@ -292,6 +306,17 @@
+             self._buffer = ""
+             return StreamingParseResult(normal_text=leftover)
+ 
++        if self._tool_start_pending:
++            buffer = self._strip_leading_think_start(self._buffer)
++            tool_idx = buffer.find(self.tool_start_token)
++            self._buffer = ""
++            self._tool_start_pending = False
++            self._in_reasoning = False
++            self._accumulated_reasoning = ""
++            return StreamingParseResult(
++                reasoning_text=buffer[:tool_idx], normal_text=buffer[tool_idx:]
++            )
++
+         # Defensive: subclasses that fill _buffer themselves may not have stripped
+         # the opening think token that _parse_streaming_increment_impl removes.
+         buffer = self._strip_leading_think_start(self._buffer)
+@@ -391,6 +416,7 @@
+             # Qwen3.5 sometimes opens ``<tool_call>`` without closing
+             # ``</think>``; treat it as an implicit reasoning close.
+             tool_start_token="<tool_call>",
++            defer_tool_start=True,
+             continue_final_message=continue_final_message,
+             previous_content=previous_content,
+             thinks_internally=True,
+--- a/python/sglang/srt/entrypoints/openai/serving_responses.py
++++ b/python/sglang/srt/entrypoints/openai/serving_responses.py
+@@ -1387,6 +1387,8 @@
+                 close_message("commentary")
+                 close_tools()
+                 reasoning_text += reasoning_chunk
++            # Raw structural markers still held by reasoning are not tools.
++            entering_tool_call = entering_tool_call and "<tool_call>" in (normal or "")
+             if entering_tool_call and (reasoning_block_started or reasoning_text):
+                 reasoning_block_closed = True
+                 reasoning_block_started = False
+@@ -2948,6 +2950,9 @@
+                                     sequence_number=-1,
+                                 )
+                             )
++                    # Only normal text released by the reasoning parser enters
++                    # tool mode; a deferred/quoted wrapper stays in reasoning.
++                    entering_tool_call = entering_tool_call and "<tool_call>" in (delta or "")
+                     if entering_tool_call and (
+                         reasoning_block_started or reasoning_state["open"]
+                     ):

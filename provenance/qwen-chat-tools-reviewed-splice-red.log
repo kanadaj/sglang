@@ -1,0 +1,12 @@
+F...                                                                     [100%]
+=================================== FAILURES ===================================
+___________ test_unknown_wrapper_cannot_splice_a_declared_call[None] ___________
+/candidate/validation/qwen-chat-tools/test_splice.py:10: in test_unknown_wrapper_cannot_splice_a_declared_call
+    assert parsed(text, [tool()], chunk) == []
+E   AssertionError: assert [('example_fu...'value': 42})] == []
+E     
+E     Left contains one more item: ('example_function', {'value': 42})
+E     Use -v to get more diff
+=========================== short test summary info ============================
+FAILED ../../candidate/validation/qwen-chat-tools/test_splice.py::test_unknown_wrapper_cannot_splice_a_declared_call[None]
+1 failed, 3 passed in 3.87s

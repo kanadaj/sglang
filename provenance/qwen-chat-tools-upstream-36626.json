@@ -1,0 +1,26 @@
+[
+  {
+    "sha": "01c52631921bbd276047b4e7d08e53931bf69c5e",
+    "filename": "python/sglang/srt/function_call/qwen3_coder_detector.py",
+    "status": "modified",
+    "additions": 5,
+    "deletions": 3,
+    "changes": 8,
+    "blob_url": "https://github.com/sgl-project/sglang/blob/25856285eeabfcf48405d369227bb4277df92d11/python%2Fsglang%2Fsrt%2Ffunction_call%2Fqwen3_coder_detector.py",
+    "raw_url": "https://github.com/sgl-project/sglang/raw/25856285eeabfcf48405d369227bb4277df92d11/python%2Fsglang%2Fsrt%2Ffunction_call%2Fqwen3_coder_detector.py",
+    "contents_url": "https://api.github.com/repos/sgl-project/sglang/contents/python%2Fsglang%2Fsrt%2Ffunction_call%2Fqwen3_coder_detector.py?ref=25856285eeabfcf48405d369227bb4277df92d11",
+    "patch": "@@ -11,6 +11,7 @@\n     _GetInfoFunc,\n )\n from sglang.srt.function_call.utils import (\n+    get_schema_properties,\n     infer_type_from_json_schema,\n     safe_literal_eval,\n )\n@@ -80,9 +81,10 @@ def _get_arguments_config(\n                 except AttributeError:\n                     return {}\n \n-                if isinstance(params, dict) and \"properties\" in params:\n-                    return params[\"properties\"]\n-                elif isinstance(params, dict):\n+                if isinstance(params, dict):\n+                    properties = get_schema_properties(params)\n+                    if properties or \"properties\" in params:\n+                        return properties\n                     return params\n                 else:\n                     return {}"
+  },
+  {
+    "sha": "d1a87a90c419a451324ccef3848f6380d5a444fb",
+    "filename": "python/sglang/srt/function_call/utils.py",
+    "status": "modified",
+    "additions": 19,
+    "deletions": 0,
+    "changes": 19,
+    "blob_url": "https://github.com/sgl-project/sglang/blob/25856285eeabfcf48405d369227bb4277df92d11/python%2Fsglang%2Fsrt%2Ffunction_call%2Futils.py",
+    "raw_url": "https://github.com/sgl-project/sglang/raw/25856285eeabfcf48405d369227bb4277df92d11/python%2Fsglang%2Fsrt%2Ffunction_call%2Futils.py",
+    "contents_url": "https://api.github.com/repos/sgl-project/sglang/contents/python%2Fsglang%2Fsrt%2Ffunction_call%2Futils.py?ref=25856285eeabfcf48405d369227bb4277df92d11",
+    "patch": "@@ -304,6 +304,25 @@ def _get_tool_schema(tool: Tool) -> dict:\n     }\n \n \n+def get_schema_properties(schema: Any) -> Dict[str, Any]:\n+    \"\"\"Top-level ``properties`` of a tool ``parameters`` schema, descending\n+    into ``anyOf``/``oneOf``/``allOf`` branches when the top level declares\n+    none (legal JSON Schema, e.g. discriminated-union arguments).\"\"\"\n+    if not isinstance(schema, dict):\n+        return {}\n+    properties = schema.get(\"properties\")\n+    if isinstance(properties, dict):\n+        return properties\n+    merged: Dict[str, Any] = {}\n+    for keyword in (\"anyOf\", \"oneOf\", \"allOf\"):\n+        branches = schema.get(keyword)\n+        if isinstance(branches, list):\n+            for branch in branches:\n+                for key, value in get_schema_properties(branch).items():\n+                    merged.setdefault(key, value)\n+    return merged\n+\n+\n def infer_type_from_json_schema(schema: Dict[str, Any]) -> Optional[str]:\n     \"\"\"\n     Infer the primary type of a parameter from JSON Schema."
+  }
+]

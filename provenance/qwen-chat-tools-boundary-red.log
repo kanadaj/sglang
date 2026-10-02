@@ -1,0 +1,11 @@
+FFFFFF.FF.......                                                         [100%]
+=========================== short test summary info ============================
+FAILED ../../candidate/validation/qwen-chat-tools/test_boundary.py::test_undeclared_name_suppressed_and_valid_recovery[None]
+FAILED ../../candidate/validation/qwen-chat-tools/test_boundary.py::test_undeclared_name_suppressed_and_valid_recovery[1]
+FAILED ../../candidate/validation/qwen-chat-tools/test_boundary.py::test_undeclared_name_suppressed_and_valid_recovery[7]
+FAILED ../../candidate/validation/qwen-chat-tools/test_boundary.py::test_undeclared_name_suppressed_and_valid_recovery[10000]
+FAILED ../../candidate/validation/qwen-chat-tools/test_boundary.py::test_reasoning_tool_boundary_parity[True-True-1]
+FAILED ../../candidate/validation/qwen-chat-tools/test_boundary.py::test_reasoning_tool_boundary_parity[True-True-7]
+FAILED ../../candidate/validation/qwen-chat-tools/test_boundary.py::test_reasoning_tool_boundary_parity[True-False-1]
+FAILED ../../candidate/validation/qwen-chat-tools/test_boundary.py::test_reasoning_tool_boundary_parity[True-False-7]
+8 failed, 8 passed in 4.03s
