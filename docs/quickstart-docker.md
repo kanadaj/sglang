@@ -1,7 +1,8 @@
 # Quick start — Qwen3.8 Flash Next NVFP4 on two Blackwell GPUs
 
 This is the **published cumulative** image: embedded model overrides, HiCache
-hybrid-checkpoint patches `0040`–`0045`, and opt-in tool patches `0046`–`0047`.
+hybrid-checkpoint patches `0040`–`0045`, opt-in tool grammar patches `0046`–`0047`,
+and Qwen tool-parser reliability fixes `0048`–`0050`.
 The image includes SGLang; you provide the complete local
 `local-inference-lab/Qwen3.8-Flash-Next-NVFP4` QAD checkpoint. It is not the
 unmodified upstream SGLang image, nor the older `embedded-overrides-20260921-v3`
@@ -14,7 +15,7 @@ docker run --rm --gpus '"device=0,1"' --ipc=host -p 127.0.0.1:30000:30000 \
   -e SGLANG_PLE_PACKED_NVFP4=1 \
   -e SGLANG_PLE_PACKED_FP8_REFERENCE=1 \
   -e SGLANG_PRIVATE_DRAFT_NVFP4_A16=1 \
-  docker.io/kanadaj/sglang-qwen38fn-sm120-turbo:hicache-pr19-embed-tools-20261001-v1@sha256:09a132dbfcd2eb4579324c8400e991135aca823a900ee8efe47459daa4931b39 \
+  docker.io/kanadaj/sglang-qwen38fn-sm120-turbo:qwen-chat-tools-20261002-v1@sha256:cfcc376e6235d06a871a0c03dbf5eadfc04b9c737564eeacbac385b8b762ae3c \
   --model-path /model \
   --tp-size=2 --quantization=modelopt_mixed \
   --kv-cache-dtype=fp8_e4m3 --context-length=262144 \
@@ -50,6 +51,15 @@ decode. Do not assume a 1M context is validated merely from a successful boot.
 
 ## Tool-call behavior
 
+This image contains `0048`–`0050` without additional opt-in flags: typed arguments
+under top-level `anyOf`/`oneOf`/`allOf`, declared-name checks, and deferred ambiguous
+tool markers inside Qwen reasoning. A quoted declared tool stays in reasoning
+when a later reasoning close arrives; a genuine unclosed-thinking call is
+released at the final stream flush. Unknown call suppression parses only original
+matches, never reparsing joined prose into a new executable call. These fixes work
+with both normal grammar enforcement and the explicit bypass below. See
+[release evidence and limitations](qwen-chat-tools.md).
+
 `--grammar-backend=none` **requires patches `0046`–`0047` in the image above**.
 It keeps tool definitions in the prompt and keeps Chat/Responses tool parsing,
 but bypasses grammar compilation and token masking. Patch `0047` also prevents
@@ -64,9 +74,11 @@ client tool schemas to safe bounds, and test your actual tools; this patch does
 not repair all compiler/schema incompatibilities. See
 [tool-call contract](qwen-strict-tools.md).
 
-The running GPUStack production instance may be on an older pinned digest;
-publishing this image does not update that instance. Clients on the older
-image will not gain patch `0046` by adding the flag alone.
+The maintainer's production deployment was updated in place to this digest and
+verified with its existing `xgrammar` settings. See the
+[release receipt](../provenance/qwen-chat-tools-release.json) for the smoke-test
+scope. Other deployments still require an explicit image update and restart;
+adding launch flags to an older image does not install missing patches.
 
 ## Extended context (YaRN): explicit CLI override
 
@@ -120,6 +132,6 @@ curl -fsS http://127.0.0.1:30000/get_server_info | \
 Also confirm the startup log says `Merged CLI model overrides onto embedded
 model config from /opt/qwen-runtime/model_overrides.json`, then test a Chat tool
 request with your real schema and validate its returned arguments. The
-[release verifier](../scripts/verify_hicache_pr19_embed_tools.py) hashes the
+[release verifier](../scripts/verify_qwen_chat_tools.py) hashes the
 complete source tree and patch transition; a server boot alone is not a tool
 correctness test.

@@ -1,0 +1,89 @@
+{
+  "profile": "qwen-chat-tools",
+  "release_tag": "qwen-chat-tools-20261002-v1",
+  "image": "docker.io/kanadaj/sglang-qwen38fn-sm120-turbo:qwen-chat-tools-20261002-v1@sha256:cfcc376e6235d06a871a0c03dbf5eadfc04b9c737564eeacbac385b8b762ae3c",
+  "source_revision": "60db9a072707ef8200b3d92aac3da6a1cd46f77d",
+  "code_pr": "https://github.com/kanadaj/sglang/pull/23",
+  "registry": {
+    "index_digest": "sha256:cfcc376e6235d06a871a0c03dbf5eadfc04b9c737564eeacbac385b8b762ae3c",
+    "runtime_digest": "sha256:6e64f467c2e3af1705f1abd5485c2d79e4d133ab5545b300e6e3d1252b2ca2bd",
+    "config_digest": "sha256:940830dba2627b1cc47c40c1d401ddf7d31eef32291044316436799cd018c0c8"
+  },
+  "source_attestation": {
+    "source_files": 4396,
+    "changed_files": 4,
+    "result_inventory_sha256": "0761f1b95229fb7ac3e0858ce8b554b47f31bc5ba64b91932d7336e6eb0b4e5f",
+    "verified_in_running_container": true
+  },
+  "cpu": {
+    "targeted_profile_predecessor_packaging_passed": 184,
+    "selected_function_call_passed": 192,
+    "reasoning_passed": 112,
+    "total_tests_passed": 488,
+    "additional_reasoning_subtests_passed": 64,
+    "deepseek_tokenizer_cases_deselected": 15,
+    "independent_parser_acceptance_checks_passed": 56
+  },
+  "production": {
+    "updated_in_place": true,
+    "replicas": 1,
+    "gpu_indexes": [
+      2,
+      3
+    ],
+    "actual_image_and_revision_verified": true,
+    "effective_settings": {
+      "context_length": 1048576,
+      "grammar_backend": "xgrammar",
+      "mem_fraction_static": 0.9,
+      "max_running_requests": 24,
+      "cuda_graph_max_bs_decode": 24,
+      "tp_size": 2
+    },
+    "launch_settings_preserved": true,
+    "routes_and_targets_preserved": true,
+    "monitoring_target_readback_verified": true,
+    "running_source_parser_acceptance_checks_passed": 56
+  },
+  "live_qualification": {
+    "api_checks_passed": 13,
+    "api_check_names": [
+      "alias-qwen",
+      "alias-qwen3.8-flash-next-nvfp4",
+      "alias-admin-assistant",
+      "direct-flat-stream-call",
+      "direct-flat-stream-answer",
+      "direct-oneOf-stream-call",
+      "direct-oneOf-stream-answer",
+      "direct-oneOf-nonstream-call",
+      "direct-oneOf-nonstream-answer",
+      "router-oneOf-stream-call",
+      "router-oneOf-stream-answer",
+      "vision-red",
+      "vision-blue"
+    ],
+    "concurrent_text_requests_passed": 4,
+    "omp": {
+      "passed": true,
+      "tool_execution_count": 1,
+      "api": "openai-completions",
+      "final_stop": "stop",
+      "final_marker_exact": true
+    },
+    "long_context": {
+      "passed": true,
+      "prompt_tokens": 270119,
+      "local_prompt_tokens": 270119,
+      "needle_fraction": 0.49987598058633415,
+      "done": true,
+      "finish": "stop",
+      "full_1m_qualification": false
+    }
+  },
+  "limits": [
+    "Short synthetic API/tool/vision checks and a single midpoint recall smoke, not a sustained throughput or production workload benchmark.",
+    "Inherited 1M configuration was preserved; only 270119 prompt tokens were exercised in this rollout.",
+    "The originally reported halted user turn was not captured or replayed.",
+    "Deferred reasoning parsing buffers ambiguous suffixes; schema type extraction is not full schema validation."
+  ]
+}
