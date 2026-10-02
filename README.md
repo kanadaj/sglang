@@ -7,7 +7,7 @@
 > extended-context YaRN and HiCache are opt-in flags on top.
 >
 > → **[docs/quickstart-docker.md](docs/quickstart-docker.md)** ·
-> **[release provenance and test scope](docs/hicache-pr19-embed-tools-release.md)**
+> **[release provenance and test scope](docs/qwen-chat-tools.md)**
 >
 > TL;DR (needs two free GPUs and a local `Qwen3.8-Flash-Next-NVFP4` checkpoint):
 >
@@ -16,7 +16,7 @@
 >   -v /absolute/path/to/Qwen3.8-Flash-Next-NVFP4:/model:ro \
 >   -e SGLANG_SM120_ONLINE_MXFP8=false -e SGLANG_PLE_PACKED_NVFP4=1 \
 >   -e SGLANG_PLE_PACKED_FP8_REFERENCE=1 -e SGLANG_PRIVATE_DRAFT_NVFP4_A16=1 \
->   docker.io/kanadaj/sglang-qwen38fn-sm120-turbo:hicache-pr19-embed-tools-20261001-v1@sha256:09a132dbfcd2eb4579324c8400e991135aca823a900ee8efe47459daa4931b39 \
+>   docker.io/kanadaj/sglang-qwen38fn-sm120-turbo:qwen-chat-tools-20261002-v1@sha256:cfcc376e6235d06a871a0c03dbf5eadfc04b9c737564eeacbac385b8b762ae3c \
 >   --model-path /model --tp-size=2 --quantization=modelopt_mixed \
 >   --context-length=262144 --mem-fraction-static=0.88 \
 >   --reasoning-parser=auto --tool-call-parser=auto --grammar-backend=none \
@@ -38,16 +38,28 @@
 > Serve lands at `http://127.0.0.1:30000/v1/chat/completions`. The full doc covers
 > explicit **YaRN**, optional **HiCache**, and the tool-call trade-off: with
 > `--grammar-backend=none`, applications must validate generated arguments.
-> Publishing this image does **not** update the running production deployment.
+> This release also fixes composite tool argument types and quoted-tool reasoning
+> boundaries. Publishing an image does **not** automatically update deployments.
 
 ---
+
+## Production rollout verified 2026-10-02
+
+The [Qwen Chat tool reliability release](docs/qwen-chat-tools.md) is deployed
+in place on the existing TP2 GPU pair 2/3. Launch settings and routes are
+unchanged, including `xgrammar`, the inherited 1048576 context setting, and
+24 running requests / decode-graph coverage. Direct/routed tool calls, vision,
+OMP tool execution and final answer, C4 text isolation, and a 270119-token
+midpoint recall smoke passed. See the [release receipt](provenance/qwen-chat-tools-release.json).
+This is not a new full-1M or production-throughput qualification; the quickstart
+above deliberately uses more conservative resource settings.
 
 **Historical production image (verified 2026-09-22; not the new tool build):**
 [`hicache-pr19-embed`](docs/embedded-model-overrides.md) at
 `docker.io/kanadaj/sglang-qwen38fn-sm120-turbo@sha256:6acf6306887726b31ad0003de9021fdf0147ffbb1a29a4e3147421bf5063d1e2`
 — embedded model-config overrides (no 2.8 KB CLI blob), the
 [prefill/decode interleaving](docs/prefill-decode-interleaving.md) fixes, and
-PR #19's HiCache checkpoint-preservation series `0040`–`0045`. Live launch
+PR #19's HiCache checkpoint-preservation series `0040`–`0045`. Historical launch
 command with the exact YaRN and HiCache flags: **[docs/production-command.sh](docs/production-command.sh)**.
 
 **Published cumulative compatibility runtime:**
@@ -80,7 +92,7 @@ Publishable source and deployment package for the locally accepted Qwen3.8
 Flash-Next LIL NVFP4 stack. **No model weights, container archives, credentials,
 private prompts, routing snapshots or failed optimization experiments.**
 
-## Current production (2026-09-13)
+## Historical production (2026-09-13)
 
 **[Chat reasoning-effort fix: contract, image, tests and rollout](docs/chat-reasoning-effort.md)**.
 Explicit Chat effort now wins over the server default; omitted effort remains

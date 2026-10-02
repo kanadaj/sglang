@@ -1,11 +1,23 @@
-# Qwen Chat tool reliability overlay (local candidate)
+# Qwen Chat tool reliability release
 
-Status: CPU-verified local candidate, **not registry-verified or deployed**. The
-README and primary quickstart intentionally retain the existing published release.
-After review and merge, rebuild from fetched merged main with its exact Git SHA,
-then independently verify registry identity and live GPU behavior before promotion.
-No operator launch arguments, templates, model registration, grammar defaults, or
-existing profile manifests are changed by this overlay.
+Published image:
+`docker.io/kanadaj/sglang-qwen38fn-sm120-turbo:qwen-chat-tools-20261002-v1@sha256:cfcc376e6235d06a871a0c03dbf5eadfc04b9c737564eeacbac385b8b762ae3c`.
+
+Built from merged source revision `60db9a072707ef8200b3d92aac3da6a1cd46f77d`
+([PR #23](https://github.com/kanadaj/sglang/pull/23)). Anonymous registry readback
+verified the index, Linux/amd64 manifest, config blob and revision label. See the
+[quickstart](quickstart-docker.md) for the complete external launch command.
+
+GPU deployment qualification is recorded in the
+[release receipt](../provenance/qwen-chat-tools-release.json). The maintainer's
+canonical production model was updated in place on GPUs 2/3, with its launch
+settings and routing unchanged. Actual running image/revision, full source tree,
+health, direct/routed tool calls, two-color vision and a real OMP tool/result/final
+answer loop passed. Four simultaneous text requests and a **270119-token**
+midpoint retrieval smoke also passed. The inherited **1M** context setting is
+not a new full-window qualification, and these are not throughput benchmarks.
+The overlay does not bake operator launch arguments, replace the checkpoint
+chat template, change grammar defaults, or alter existing profile manifests.
 
 ## Ordered scope
 
@@ -71,18 +83,20 @@ docker build --network none --pull=false \
 
 For a **reviewed, clean, fetched merged-main checkout**, the production build must
 use `--build-arg SOURCE_REVISION="$(git rev-parse HEAD)"` without the candidate
-suffix. No final published tag/digest is claimed here.
+suffix. The published image above was built from the merged code revision shown
+at the top; later documentation-only commits do not change its source inventory.
 
 The offline CPU runner requires `QWEN_TOKENIZER_PATH` to name an existing resolved
 local tokenizer directory. It fails immediately if unset. After setting that
 operator-owned path, run:
 
 ```bash
-bash scripts/test_qwen_chat_tools.sh
+QWEN_CHAT_TOOLS_IMAGE=kanadaj/sglang-qwen38fn-sm120-turbo@sha256:cfcc376e6235d06a871a0c03dbf5eadfc04b9c737564eeacbac385b8b762ae3c \
+  bash scripts/test_qwen_chat_tools.sh
 ```
 
-The candidate tag above is the runner's default; set `QWEN_CHAT_TOOLS_IMAGE` to test
-a different already-local rebuilt image. Containers run network-disabled, CPU-only,
+The runner defaults to a development candidate; the explicit image above selects
+the already-pulled release instead. Containers run network-disabled, CPU-only,
 non-root, with read-only fixture mounts and fail-fast shell handling.
 
 ## Evidence
@@ -92,7 +106,7 @@ non-root, with read-only fixture mounts and fail-fast shell handling.
   Responses adapters with CPU generation injection and an offline tokenizer; it
   asserts 200 responses, exact content/reasoning/call semantics and parity rather
   than hiding server errors. Fixtures assemble structural markers by concatenation.
-- Candidate GREEN: **140** profile regressions/controls, **27** predecessor cumulative
+- Release CPU GREEN: **140** profile regressions/controls, **27** predecessor cumulative
   tests, **17** packaging contracts/negative controls, **190** selected registered
   function-call tests, **2** registered unknown-name tests and **112** full registered
   reasoning tests: **488 unique tests passed**, plus **64** subtests separately.
@@ -106,7 +120,9 @@ non-root, with read-only fixture mounts and fail-fast shell handling.
 - Warnings are existing CPU backend and dependency deprecations, not suppressed
   failures. The concise runner hides warning detail but preserves failure status.
 
-Full logs, source transition manifests, selected upstream diffs and the local
-image identity receipt are under `provenance/qwen-chat-tools-*`. GPU validation,
-registry publication/readback, final merged revision labeling, and deployment are
-separate release gates owned by the release maintainer.
+Full logs, source transition manifests and selected upstream diffs are under
+`provenance/qwen-chat-tools-*`. Candidate receipts remain historical CPU evidence;
+the **release receipt** binds the final published image, merged revision and live
+qualification. The original user's halted turn was not captured or replayed;
+this release fixes the independently reproduced parser failures, not every
+possible reason an agent could stop.
