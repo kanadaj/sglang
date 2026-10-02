@@ -1,0 +1,108 @@
+--- a/python/sglang/srt/function_call/qwen3_coder_detector.py
++++ b/python/sglang/srt/function_call/qwen3_coder_detector.py
+@@ -6,2 +6,3 @@
+ from sglang.srt.entrypoints.openai.protocol import Tool
++from sglang.srt.environ import envs
+ from sglang.srt.function_call.base_format_detector import BaseFormatDetector
+@@ -60,2 +61,3 @@
+         self.current_func_name: Optional[str] = None
++        self._suppress_current_call = False
+ 
+@@ -93,2 +95,21 @@
+         return {}
++
++    def _is_declared_tool(self, func_name: str, tools: Optional[list[Tool]]) -> bool:
++        """Whether ``func_name`` should be emitted as a tool call.
++
++        True when it matches a declared function tool, when unknown tool
++        calls are being forwarded (``SGLANG_FORWARD_UNKNOWN_TOOLS``), or when
++        there is nothing to validate against. Mirrors
++        ``base_format_detector.parse_base_json``, which drops names outside
++        the declared set unless that env var is set.
++        """
++        if not tools or envs.SGLANG_FORWARD_UNKNOWN_TOOLS.get():
++            return True
++        for config in tools:
++            try:
++                if config.type == "function" and config.function.name == func_name:
++                    return True
++            except AttributeError:
++                continue
++        return False
+ 
+@@ -185,2 +206,23 @@
+ 
++        # Parse only original matches. Suppressed wrappers must never splice
++        # surrounding text into a newly executable call.
++        raw_tool_calls = []
++        normal_spans = []
++        cursor = 0
++        collecting_normal = True
++        for match in self.tool_call_regex.finditer(text):
++            if collecting_normal:
++                normal_spans.append(text[cursor : match.start()])
++            funcs = self.tool_call_function_regex.findall(match.group(1))
++            names = [(a or b).split(">", 1)[0] for a, b in funcs if ">" in (a or b)]
++            if not names or any(self._is_declared_tool(name, tools) for name in names):
++                raw_tool_calls.append(match.group(1))
++                collecting_normal = False
++            cursor = match.end()
++        if collecting_normal:
++            normal_spans.append(text[cursor:])
++        normal_text = "".join(normal_spans)
++        if cursor and not raw_tool_calls:
++            return StreamingParseResult(normal_text=normal_text)
++
+         calls = []
+@@ -189,3 +231,2 @@
+             # Note: This is a simplified regex approach consistent with vLLM
+-            raw_tool_calls = self.tool_call_regex.findall(text)
+             if not raw_tool_calls:
+@@ -206,2 +247,4 @@
+                     func_name = func_body[:name_end]
++                    if not self._is_declared_tool(func_name, tools):
++                        continue
+                     params_str = func_body[name_end + 1 :]
+@@ -236,7 +279,8 @@
+ 
+-            # Determine normal text (text before the first tool call)
+-            start_idx = text.find(self.tool_call_start_token)
+-            if start_idx == -1:
+-                start_idx = text.find(self.tool_call_prefix)
+-            normal_text = text[:start_idx] if start_idx > 0 else ""
++            # The fallback has no complete wrapper spans to classify.
++            if not cursor:
++                start_idx = text.find(self.tool_call_start_token)
++                if start_idx == -1:
++                    start_idx = text.find(self.tool_call_prefix)
++                normal_text = text[:start_idx] if start_idx > 0 else ""
+ 
+@@ -277,2 +321,3 @@
+                 self.is_inside_tool_call = True
++                self._suppress_current_call = False
+                 continue
+@@ -287,2 +332,9 @@
+ 
++                    if not self._is_declared_tool(func_name, tools):
++                        self._suppress_current_call = True
++                        self.current_func_name = None
++                        self.parsed_pos += end_angle + 1
++                        continue
++
++                    self._suppress_current_call = False
+                     self.current_tool_id += 1
+@@ -310,3 +362,3 @@
+             # -------------------------------------------------------
+-            if self.is_inside_tool_call and current_slice.startswith(self.parameter_prefix):
++            if self.is_inside_tool_call and not self._suppress_current_call and current_slice.startswith(self.parameter_prefix):
+                 name_end = current_slice.find(">")
+@@ -395,2 +447,5 @@
+             if self.is_inside_tool_call and current_slice.startswith(self.function_end_token):
++                if self._suppress_current_call:
++                    self.parsed_pos += len(self.function_end_token)
++                    continue
+                 if not self.json_started:
+@@ -414,2 +469,3 @@
+                 self.is_inside_tool_call = False  # [FIX] Exit tool call region
++                self._suppress_current_call = False
+                 continue

@@ -1,0 +1,15 @@
+# Separate cumulative overlay; launch flags remain operator-owned.
+FROM docker.io/kanadaj/sglang-qwen38fn-sm120-turbo@sha256:09a132dbfcd2eb4579324c8400e991135aca823a900ee8efe47459daa4931b39
+ARG SOURCE_REVISION
+RUN test -n "$SOURCE_REVISION"
+COPY patches/ /opt/qwen-chat-tools/patches/
+COPY provenance/hicache-pr19-embed-runtime-files.json provenance/hicache-pr19-embed.json provenance/hicache-pr19-embed-tools.json provenance/qwen-chat-tools.json provenance/qwen-chat-tools-runtime-files.json /opt/qwen-chat-tools/provenance/
+COPY scripts/verify_hicache_pr19_embed.py scripts/verify_hicache_pr19_embed_tools.py scripts/verify_qwen_chat_tools.py /opt/qwen-chat-tools/scripts/
+RUN python3 -B /opt/qwen-chat-tools/scripts/verify_qwen_chat_tools.py --tree /sgl-workspace/sglang --apply
+LABEL org.opencontainers.image.source="https://github.com/kanadaj/sglang" \
+      org.opencontainers.image.revision="$SOURCE_REVISION" \
+      org.opencontainers.image.description="Cumulative PR19 embedded-tools parent plus Qwen composite schemas, declared tool names and deferred reasoning boundaries; CPU regressions verified, GPU deployment qualification separate" \
+      io.github.kanadaj.sglang.profile="qwen-chat-tools" \
+      io.github.kanadaj.sglang.parent="sha256:09a132dbfcd2eb4579324c8400e991135aca823a900ee8efe47459daa4931b39"
+ENTRYPOINT ["python3", "-m", "sglang.launch_server"]
+CMD ["--help"]

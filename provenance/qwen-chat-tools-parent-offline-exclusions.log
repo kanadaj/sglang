@@ -1,0 +1,616 @@
+FFFFFFFFFFFFFFF                                                          [100%]
+=================================== FAILURES ===================================
+__________ TestDeepSeekV32Detector.test_detect_and_parse_json_format ___________
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:437: in cached_files
+    hf_hub_download(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py:88: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1019: in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1166: in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1895: in _raise_on_head_call_error
+    raise LocalEntryNotFoundError(
+E   huggingface_hub.errors.LocalEntryNotFoundError: Cannot find the requested files in the disk cache and outgoing traffic has been disabled. To enable hf.co look-ups and downloads online, set 'local_files_only' to False.
+
+The above exception was the direct cause of the following exception:
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/tokenization_auto.py:716: in from_pretrained
+    config = AutoConfig.from_pretrained(
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/configuration_auto.py:376: in from_pretrained
+    config_dict, unused_kwargs = PreTrainedConfig.get_config_dict(pretrained_model_name_or_path, **kwargs)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:687: in get_config_dict
+    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:742: in _get_config_dict
+    resolved_config_file = cached_file(
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:293: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:513: in cached_files
+    raise OSError(
+E   OSError: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+E   Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'.
+
+During handling of the above exception, another exception occurred:
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:437: in cached_files
+    hf_hub_download(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py:88: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1019: in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1166: in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1895: in _raise_on_head_call_error
+    raise LocalEntryNotFoundError(
+E   huggingface_hub.errors.LocalEntryNotFoundError: Cannot find the requested files in the disk cache and outgoing traffic has been disabled. To enable hf.co look-ups and downloads online, set 'local_files_only' to False.
+
+The above exception was the direct cause of the following exception:
+test/registered/unit/function_call/test_function_call_parser.py:1583: in setUp
+    self.tokenizer = get_tokenizer("deepseek-ai/DeepSeek-V3.2")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+python/sglang/srt/utils/***/tokenizer.py:538: in get_tokenizer
+    tokenizer = _auto_tokenizer_from_pretrained(
+python/sglang/srt/utils/***/tokenizer.py:178: in _auto_tokenizer_from_pretrained
+    tokenizer = AutoTokenizer.from_pretrained(
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/tokenization_auto.py:720: in from_pretrained
+    config = PreTrainedConfig.from_pretrained(pretrained_model_name_or_path, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:646: in from_pretrained
+    config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:687: in get_config_dict
+    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:742: in _get_config_dict
+    resolved_config_file = cached_file(
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:293: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:513: in cached_files
+    raise OSError(
+E   OSError: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+E   Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'.
+_________ TestDeepSeekV32Detector.test_detect_and_parse_no_parameters __________
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:437: in cached_files
+    hf_hub_download(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py:88: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1019: in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1166: in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1895: in _raise_on_head_call_error
+    raise LocalEntryNotFoundError(
+E   huggingface_hub.errors.LocalEntryNotFoundError: Cannot find the requested files in the disk cache and outgoing traffic has been disabled. To enable hf.co look-ups and downloads online, set 'local_files_only' to False.
+
+The above exception was the direct cause of the following exception:
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/tokenization_auto.py:716: in from_pretrained
+    config = AutoConfig.from_pretrained(
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/configuration_auto.py:376: in from_pretrained
+    config_dict, unused_kwargs = PreTrainedConfig.get_config_dict(pretrained_model_name_or_path, **kwargs)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:687: in get_config_dict
+    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:742: in _get_config_dict
+    resolved_config_file = cached_file(
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:293: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:513: in cached_files
+    raise OSError(
+E   OSError: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+E   Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'.
+
+During handling of the above exception, another exception occurred:
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:437: in cached_files
+    hf_hub_download(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py:88: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1019: in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1166: in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1895: in _raise_on_head_call_error
+    raise LocalEntryNotFoundError(
+E   huggingface_hub.errors.LocalEntryNotFoundError: Cannot find the requested files in the disk cache and outgoing traffic has been disabled. To enable hf.co look-ups and downloads online, set 'local_files_only' to False.
+
+The above exception was the direct cause of the following exception:
+test/registered/unit/function_call/test_function_call_parser.py:1583: in setUp
+    self.tokenizer = get_tokenizer("deepseek-ai/DeepSeek-V3.2")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+python/sglang/srt/utils/***/tokenizer.py:538: in get_tokenizer
+    tokenizer = _auto_tokenizer_from_pretrained(
+python/sglang/srt/utils/***/tokenizer.py:178: in _auto_tokenizer_from_pretrained
+    tokenizer = AutoTokenizer.from_pretrained(
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/tokenization_auto.py:720: in from_pretrained
+    config = PreTrainedConfig.from_pretrained(pretrained_model_name_or_path, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:646: in from_pretrained
+    config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:687: in get_config_dict
+    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:742: in _get_config_dict
+    resolved_config_file = cached_file(
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:293: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:513: in cached_files
+    raise OSError(
+E   OSError: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+E   Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'.
+___________ TestDeepSeekV32Detector.test_detect_and_parse_xml_format ___________
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:437: in cached_files
+    hf_hub_download(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py:88: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1019: in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1166: in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1895: in _raise_on_head_call_error
+    raise LocalEntryNotFoundError(
+E   huggingface_hub.errors.LocalEntryNotFoundError: Cannot find the requested files in the disk cache and outgoing traffic has been disabled. To enable hf.co look-ups and downloads online, set 'local_files_only' to False.
+
+The above exception was the direct cause of the following exception:
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/tokenization_auto.py:716: in from_pretrained
+    config = AutoConfig.from_pretrained(
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/configuration_auto.py:376: in from_pretrained
+    config_dict, unused_kwargs = PreTrainedConfig.get_config_dict(pretrained_model_name_or_path, **kwargs)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:687: in get_config_dict
+    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:742: in _get_config_dict
+    resolved_config_file = cached_file(
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:293: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:513: in cached_files
+    raise OSError(
+E   OSError: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+E   Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'.
+
+During handling of the above exception, another exception occurred:
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:437: in cached_files
+    hf_hub_download(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py:88: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1019: in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1166: in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1895: in _raise_on_head_call_error
+    raise LocalEntryNotFoundError(
+E   huggingface_hub.errors.LocalEntryNotFoundError: Cannot find the requested files in the disk cache and outgoing traffic has been disabled. To enable hf.co look-ups and downloads online, set 'local_files_only' to False.
+
+The above exception was the direct cause of the following exception:
+test/registered/unit/function_call/test_function_call_parser.py:1583: in setUp
+    self.tokenizer = get_tokenizer("deepseek-ai/DeepSeek-V3.2")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+python/sglang/srt/utils/***/tokenizer.py:538: in get_tokenizer
+    tokenizer = _auto_tokenizer_from_pretrained(
+python/sglang/srt/utils/***/tokenizer.py:178: in _auto_tokenizer_from_pretrained
+    tokenizer = AutoTokenizer.from_pretrained(
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/tokenization_auto.py:720: in from_pretrained
+    config = PreTrainedConfig.from_pretrained(pretrained_model_name_or_path, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:646: in from_pretrained
+    config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:687: in get_config_dict
+    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:742: in _get_config_dict
+    resolved_config_file = cached_file(
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:293: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:513: in cached_files
+    raise OSError(
+E   OSError: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+E   Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'.
+____________ TestDeepSeekV32Detector.test_get_model_structural_tag _____________
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:437: in cached_files
+    hf_hub_download(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py:88: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1019: in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1166: in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1895: in _raise_on_head_call_error
+    raise LocalEntryNotFoundError(
+E   huggingface_hub.errors.LocalEntryNotFoundError: Cannot find the requested files in the disk cache and outgoing traffic has been disabled. To enable hf.co look-ups and downloads online, set 'local_files_only' to False.
+
+The above exception was the direct cause of the following exception:
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/tokenization_auto.py:716: in from_pretrained
+    config = AutoConfig.from_pretrained(
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/configuration_auto.py:376: in from_pretrained
+    config_dict, unused_kwargs = PreTrainedConfig.get_config_dict(pretrained_model_name_or_path, **kwargs)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:687: in get_config_dict
+    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:742: in _get_config_dict
+    resolved_config_file = cached_file(
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:293: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+... [OUTPUT TRUNCATED - 40,105 chars omitted out of 90,032 total] ...
+
+.get_config_dict(pretrained_model_name_or_path, **kwargs)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:687: in get_config_dict
+    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:742: in _get_config_dict
+    resolved_config_file = cached_file(
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:293: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:513: in cached_files
+    raise OSError(
+E   OSError: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+E   Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'.
+
+During handling of the above exception, another exception occurred:
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:437: in cached_files
+    hf_hub_download(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py:88: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1019: in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1166: in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1895: in _raise_on_head_call_error
+    raise LocalEntryNotFoundError(
+E   huggingface_hub.errors.LocalEntryNotFoundError: Cannot find the requested files in the disk cache and outgoing traffic has been disabled. To enable hf.co look-ups and downloads online, set 'local_files_only' to False.
+
+The above exception was the direct cause of the following exception:
+test/registered/unit/function_call/test_function_call_parser.py:2033: in setUp
+    self.tokenizer = get_tokenizer("deepseek-ai/DeepSeek-V3.2")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+python/sglang/srt/utils/***/tokenizer.py:538: in get_tokenizer
+    tokenizer = _auto_tokenizer_from_pretrained(
+python/sglang/srt/utils/***/tokenizer.py:178: in _auto_tokenizer_from_pretrained
+    tokenizer = AutoTokenizer.from_pretrained(
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/tokenization_auto.py:720: in from_pretrained
+    config = PreTrainedConfig.from_pretrained(pretrained_model_name_or_path, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:646: in from_pretrained
+    config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:687: in get_config_dict
+    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:742: in _get_config_dict
+    resolved_config_file = cached_file(
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:293: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:513: in cached_files
+    raise OSError(
+E   OSError: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+E   Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'.
+________ TestDeepSeekV4Detector.test_self_closing_mixed_with_long_form _________
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:437: in cached_files
+    hf_hub_download(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py:88: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1019: in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1166: in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1895: in _raise_on_head_call_error
+    raise LocalEntryNotFoundError(
+E   huggingface_hub.errors.LocalEntryNotFoundError: Cannot find the requested files in the disk cache and outgoing traffic has been disabled. To enable hf.co look-ups and downloads online, set 'local_files_only' to False.
+
+The above exception was the direct cause of the following exception:
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/tokenization_auto.py:716: in from_pretrained
+    config = AutoConfig.from_pretrained(
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/configuration_auto.py:376: in from_pretrained
+    config_dict, unused_kwargs = PreTrainedConfig.get_config_dict(pretrained_model_name_or_path, **kwargs)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:687: in get_config_dict
+    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:742: in _get_config_dict
+    resolved_config_file = cached_file(
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:293: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:513: in cached_files
+    raise OSError(
+E   OSError: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+E   Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'.
+
+During handling of the above exception, another exception occurred:
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:437: in cached_files
+    hf_hub_download(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py:88: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1019: in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1166: in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1895: in _raise_on_head_call_error
+    raise LocalEntryNotFoundError(
+E   huggingface_hub.errors.LocalEntryNotFoundError: Cannot find the requested files in the disk cache and outgoing traffic has been disabled. To enable hf.co look-ups and downloads online, set 'local_files_only' to False.
+
+The above exception was the direct cause of the following exception:
+test/registered/unit/function_call/test_function_call_parser.py:2033: in setUp
+    self.tokenizer = get_tokenizer("deepseek-ai/DeepSeek-V3.2")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+python/sglang/srt/utils/***/tokenizer.py:538: in get_tokenizer
+    tokenizer = _auto_tokenizer_from_pretrained(
+python/sglang/srt/utils/***/tokenizer.py:178: in _auto_tokenizer_from_pretrained
+    tokenizer = AutoTokenizer.from_pretrained(
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/tokenization_auto.py:720: in from_pretrained
+    config = PreTrainedConfig.from_pretrained(pretrained_model_name_or_path, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:646: in from_pretrained
+    config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:687: in get_config_dict
+    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:742: in _get_config_dict
+    resolved_config_file = cached_file(
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:293: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:513: in cached_files
+    raise OSError(
+E   OSError: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+E   Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'.
+___________ TestDeepSeekV4Detector.test_self_closing_zero_arg_invoke ___________
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:437: in cached_files
+    hf_hub_download(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py:88: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1019: in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1166: in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1895: in _raise_on_head_call_error
+    raise LocalEntryNotFoundError(
+E   huggingface_hub.errors.LocalEntryNotFoundError: Cannot find the requested files in the disk cache and outgoing traffic has been disabled. To enable hf.co look-ups and downloads online, set 'local_files_only' to False.
+
+The above exception was the direct cause of the following exception:
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/tokenization_auto.py:716: in from_pretrained
+    config = AutoConfig.from_pretrained(
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/configuration_auto.py:376: in from_pretrained
+    config_dict, unused_kwargs = PreTrainedConfig.get_config_dict(pretrained_model_name_or_path, **kwargs)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:687: in get_config_dict
+    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:742: in _get_config_dict
+    resolved_config_file = cached_file(
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:293: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:513: in cached_files
+    raise OSError(
+E   OSError: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+E   Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'.
+
+During handling of the above exception, another exception occurred:
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:437: in cached_files
+    hf_hub_download(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py:88: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1019: in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1166: in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1895: in _raise_on_head_call_error
+    raise LocalEntryNotFoundError(
+E   huggingface_hub.errors.LocalEntryNotFoundError: Cannot find the requested files in the disk cache and outgoing traffic has been disabled. To enable hf.co look-ups and downloads online, set 'local_files_only' to False.
+
+The above exception was the direct cause of the following exception:
+test/registered/unit/function_call/test_function_call_parser.py:2033: in setUp
+    self.tokenizer = get_tokenizer("deepseek-ai/DeepSeek-V3.2")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+python/sglang/srt/utils/***/tokenizer.py:538: in get_tokenizer
+    tokenizer = _auto_tokenizer_from_pretrained(
+python/sglang/srt/utils/***/tokenizer.py:178: in _auto_tokenizer_from_pretrained
+    tokenizer = AutoTokenizer.from_pretrained(
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/tokenization_auto.py:720: in from_pretrained
+    config = PreTrainedConfig.from_pretrained(pretrained_model_name_or_path, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:646: in from_pretrained
+    config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:687: in get_config_dict
+    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:742: in _get_config_dict
+    resolved_config_file = cached_file(
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:293: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:513: in cached_files
+    raise OSError(
+E   OSError: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+E   Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'.
+__________ TestDeepSeekV4Detector.test_streaming_self_closing_invoke ___________
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:437: in cached_files
+    hf_hub_download(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py:88: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1019: in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1166: in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1895: in _raise_on_head_call_error
+    raise LocalEntryNotFoundError(
+E   huggingface_hub.errors.LocalEntryNotFoundError: Cannot find the requested files in the disk cache and outgoing traffic has been disabled. To enable hf.co look-ups and downloads online, set 'local_files_only' to False.
+
+The above exception was the direct cause of the following exception:
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/tokenization_auto.py:716: in from_pretrained
+    config = AutoConfig.from_pretrained(
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/configuration_auto.py:376: in from_pretrained
+    config_dict, unused_kwargs = PreTrainedConfig.get_config_dict(pretrained_model_name_or_path, **kwargs)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:687: in get_config_dict
+    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:742: in _get_config_dict
+    resolved_config_file = cached_file(
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:293: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:513: in cached_files
+    raise OSError(
+E   OSError: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+E   Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'.
+
+During handling of the above exception, another exception occurred:
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:437: in cached_files
+    hf_hub_download(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py:88: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1019: in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1166: in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1895: in _raise_on_head_call_error
+    raise LocalEntryNotFoundError(
+E   huggingface_hub.errors.LocalEntryNotFoundError: Cannot find the requested files in the disk cache and outgoing traffic has been disabled. To enable hf.co look-ups and downloads online, set 'local_files_only' to False.
+
+The above exception was the direct cause of the following exception:
+test/registered/unit/function_call/test_function_call_parser.py:2033: in setUp
+    self.tokenizer = get_tokenizer("deepseek-ai/DeepSeek-V3.2")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+python/sglang/srt/utils/***/tokenizer.py:538: in get_tokenizer
+    tokenizer = _auto_tokenizer_from_pretrained(
+python/sglang/srt/utils/***/tokenizer.py:178: in _auto_tokenizer_from_pretrained
+    tokenizer = AutoTokenizer.from_pretrained(
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/tokenization_auto.py:720: in from_pretrained
+    config = PreTrainedConfig.from_pretrained(pretrained_model_name_or_path, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:646: in from_pretrained
+    config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:687: in get_config_dict
+    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:742: in _get_config_dict
+    resolved_config_file = cached_file(
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:293: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:513: in cached_files
+    raise OSError(
+E   OSError: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+E   Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'.
+_______________ TestDeepSeekV4Detector.test_streaming_xml_format _______________
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:437: in cached_files
+    hf_hub_download(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py:88: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1019: in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1166: in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1895: in _raise_on_head_call_error
+    raise LocalEntryNotFoundError(
+E   huggingface_hub.errors.LocalEntryNotFoundError: Cannot find the requested files in the disk cache and outgoing traffic has been disabled. To enable hf.co look-ups and downloads online, set 'local_files_only' to False.
+
+The above exception was the direct cause of the following exception:
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/tokenization_auto.py:716: in from_pretrained
+    config = AutoConfig.from_pretrained(
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/configuration_auto.py:376: in from_pretrained
+    config_dict, unused_kwargs = PreTrainedConfig.get_config_dict(pretrained_model_name_or_path, **kwargs)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:687: in get_config_dict
+    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:742: in _get_config_dict
+    resolved_config_file = cached_file(
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:293: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:513: in cached_files
+    raise OSError(
+E   OSError: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+E   Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'.
+
+During handling of the above exception, another exception occurred:
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:437: in cached_files
+    hf_hub_download(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py:88: in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1019: in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1166: in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:1895: in _raise_on_head_call_error
+    raise LocalEntryNotFoundError(
+E   huggingface_hub.errors.LocalEntryNotFoundError: Cannot find the requested files in the disk cache and outgoing traffic has been disabled. To enable hf.co look-ups and downloads online, set 'local_files_only' to False.
+
+The above exception was the direct cause of the following exception:
+test/registered/unit/function_call/test_function_call_parser.py:2033: in setUp
+    self.tokenizer = get_tokenizer("deepseek-ai/DeepSeek-V3.2")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+python/sglang/srt/utils/***/tokenizer.py:538: in get_tokenizer
+    tokenizer = _auto_tokenizer_from_pretrained(
+python/sglang/srt/utils/***/tokenizer.py:178: in _auto_tokenizer_from_pretrained
+    tokenizer = AutoTokenizer.from_pretrained(
+/usr/local/lib/python3.12/dist-packages/transformers/models/auto/tokenization_auto.py:720: in from_pretrained
+    config = PreTrainedConfig.from_pretrained(pretrained_model_name_or_path, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:646: in from_pretrained
+    config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:687: in get_config_dict
+    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py:742: in _get_config_dict
+    resolved_config_file = cached_file(
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:293: in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py:513: in cached_files
+    raise OSError(
+E   OSError: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+E   Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'.
+=========================== short test summary info ============================
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV32Detector::test_detect_and_parse_json_format
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV32Detector::test_detect_and_parse_no_parameters
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV32Detector::test_detect_and_parse_xml_format
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV32Detector::test_get_model_structural_tag
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV32Detector::test_self_closing_zero_arg_invoke
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV32Detector::test_streaming_json_format
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV32Detector::test_streaming_no_parameters
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV32Detector::test_streaming_no_parameters_with_whitespace
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV32Detector::test_streaming_xml_format
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV4Detector::test_detect_and_parse_xml_format
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV4Detector::test_get_model_structural_tag
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV4Detector::test_self_closing_mixed_with_long_form
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV4Detector::test_self_closing_zero_arg_invoke
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV4Detector::test_streaming_self_closing_invoke
+FAILED test/registered/unit/function_call/test_function_call_parser.py::TestDeepSeekV4Detector::test_streaming_xml_format
+15 failed, 190 deselected, 1 warning in 6.82s

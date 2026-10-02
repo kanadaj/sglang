@@ -1,0 +1,21 @@
+Reapply return code: 1
+Traceback (most recent call last):
+  File "/home/kanadaj/sglang-tuning/tool-fixes-20261002/fix-source/scripts/verify_qwen_chat_tools.py", line 73, in <module>
+    result = verify(args.tree.resolve(), args.apply)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/kanadaj/sglang-tuning/tool-fixes-20261002/fix-source/scripts/verify_qwen_chat_tools.py", line 45, in verify
+    verify_tree(tree, before)
+  File "/home/kanadaj/sglang-tuning/tool-fixes-20261002/fix-source/scripts/verify_hicache_pr19_embed.py", line 85, in verify_tree
+    raise ValueError("Source hash mismatch: " + name)
+ValueError: Source hash mismatch: python/sglang/srt/entrypoints/openai/serving_responses.py
+
+Unpatched parent return code: 1
+Traceback (most recent call last):
+  File "/candidate/scripts/verify_qwen_chat_tools.py", line 73, in <module>
+    result = verify(args.tree.resolve(), args.apply)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/candidate/scripts/verify_qwen_chat_tools.py", line 54, in verify
+    verify_tree(tree, after)
+  File "/candidate/scripts/verify_hicache_pr19_embed.py", line 85, in verify_tree
+    raise ValueError("Source hash mismatch: " + name)
+ValueError: Source hash mismatch: python/sglang/srt/entrypoints/openai/serving_responses.py
